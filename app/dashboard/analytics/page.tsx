@@ -6,6 +6,14 @@ import { Chart, registerables } from "chart.js"
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
 Chart.register(...registerables)
 
+// Define Google Maps global types
+declare global {
+  interface Window {
+    initMap: () => void;
+    google: typeof google;
+  }
+}
+
 export default function AnalyticsDashboard() {
   const [loading, setLoading] = useState(false)
   const pieChartRef = useRef<HTMLCanvasElement>(null)
@@ -257,14 +265,13 @@ export default function AnalyticsDashboard() {
       window.initMap()
     } else {
       loadGoogleMapsScript()
-    }
-
-    return () => {
+    }    return () => {
       // Clean up
-      if (typeof window.initMap === 'function') { // Check if initMap is a function before reassigning
+      if (window.google && typeof window.initMap === 'function') {
         window.initMap = () => {};
+        // @ts-ignore
+        window.google = undefined;
       }
-      window.google = undefined;
     }
   }, [data.hotdaData])
 
