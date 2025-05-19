@@ -40,39 +40,18 @@ export function DynamicHeader() {
     <div className="bg-red-600 text-white p-4 flex justify-between items-center">
       <h1 className="text-xl font-bold">Insight Dashboard NCX-PRO SULBAGTENG 2025 | {getSubtitle()}</h1>
       <div className="flex items-center">
-        <div className="bg-white rounded-xl p-1 flex items-center space-x-2">
+        <div className="bg-white rounded-xl p-1 flex items-center">
           <Image
-            src="/placeholder.svg?height=30&width=40"
-            alt="Logo 1"
-            width={40}
-            height={30}
+            src="/telkom-logo.png"
+            alt="Telkom Logo"
             className="object-contain"
+            width={80}
+            height={30}
           />
           <Image
-            src="/placeholder.svg?height=30&width=40"
-            alt="Logo 2"
-            width={40}
-            height={30}
-            className="object-contain"
-          />
-          <Image
-            src="/placeholder.svg?height=30&width=40"
-            alt="Logo 3"
-            width={40}
-            height={30}
-            className="object-contain"
-          />
-          <Image
-            src="/placeholder.svg?height=30&width=40"
-            alt="Logo 4"
-            width={40}
-            height={30}
-            className="object-contain"
-          />
-          <Image
-            src="/placeholder.svg?height=30&width=40"
-            alt="Logo 5"
-            width={40}
+            src="/ncs-logo.png"
+            alt="NCX Logo"
+            width={300}
             height={30}
             className="object-contain"
           />
