@@ -14,28 +14,113 @@ declare global {
   }
 }
 
+type ProgressType = {
+  COMPLETE: number;
+  "IN PROGRESS": number;
+  "PENDING BASO": number;
+  "PENDING BILLING APROVAL": number;
+};
+
+// Fungsi untuk fetch data dari Google Sheets
+async function fetchProgressData(): Promise<ProgressType> {
+  const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
+  const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
+  const sheetName = 'MTDProgress NCX';
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!json.values || json.values.length < 2) return {
+    COMPLETE: 0,
+    "IN PROGRESS": 0,
+    "PENDING BASO": 0,
+    "PENDING BILLING APROVAL": 0,
+  };
+  const rows: [string, string][] = json.values.slice(1); // skip header
+  const result: ProgressType = {
+    COMPLETE: 0,
+    "IN PROGRESS": 0,
+    "PENDING BASO": 0,
+    "PENDING BILLING APROVAL": 0,
+  };
+  rows.forEach(([status, count]) => {
+    const key = status.trim().toUpperCase() as keyof ProgressType;
+    if (result.hasOwnProperty(key)) {
+      result[key] = Number(count);
+    }
+  });
+  return result;
+}
+
+// Fungsi untuk fetch data dari sheet UNIT NCX
+async function fetchUnitSummary() {
+  const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
+  const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
+  const sheetName = 'UNIT NCX';
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!json.values || json.values.length < 2) return { totalFailed: 0, overallAchPercentage: 0 };
+  const rows = json.values.slice(1); // skip header
+  let totalFailed = 0;
+  let achSum = 0;
+  let achCount = 0;
+  rows.forEach((cols: string[]) => {
+    // Failed di kolom ke-2, % ACH di kolom ke-12
+    const failed = Number(cols[2]) || 0;
+    let ach = cols[12] || "0";
+    ach = ach.replace(/%/g, "");
+    const achNum = Number(ach);
+    if (!isNaN(achNum)) {
+      achSum += achNum;
+      achCount++;
+    }
+    totalFailed += failed;
+  });
+  return {
+    totalFailed,
+    overallAchPercentage: achCount > 0 ? (achSum / achCount) : 0,
+  };
+}
+
 export default function AnalyticsDashboard() {
   const [loading, setLoading] = useState(false)
   const pieChartRef = useRef<HTMLCanvasElement>(null)
   const barChartRef = useRef<HTMLCanvasElement>(null)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 
-  // Mock data based on the screenshot
+  // State untuk data progress dari Google Sheets
+  const [progress, setProgress] = useState<ProgressType>({
+    COMPLETE: 0,
+    "IN PROGRESS": 0,
+    "PENDING BASO": 0,
+    "PENDING BILLING APROVAL": 0,
+  });
+
+  const [unitSummary, setUnitSummary] = useState({ totalFailed: 0, overallAchPercentage: 0 });
+
+  // Fetch data dari Google Sheets saat mount
+  useEffect(() => {
+    fetchProgressData().then(setProgress);
+    fetchUnitSummary().then(setUnitSummary);
+  }, []);
+
+  // Build data object using progress
+  const totalOrders = progress.COMPLETE + progress["IN PROGRESS"] + progress["PENDING BASO"] + progress["PENDING BILLING APROVAL"];
   const data = {
-    totalOrders: 255,
-    inProgress: 72,
-    pendingBaso: 110,
-    pendingBillingApproval: 19,
-    totalComplete: 52,
-    totalFailed: 0,
-    overallAchPercentage: 20.39,
+    totalOrders,
+    inProgress: progress["IN PROGRESS"],
+    pendingBaso: progress["PENDING BASO"],
+    pendingBillingApproval: progress["PENDING BILLING APROVAL"],
+    totalComplete: progress.COMPLETE,
+    totalFailed: unitSummary.totalFailed,
+    overallAchPercentage: unitSummary.overallAchPercentage.toFixed(2),
     ordersCompleteYTD: 949,
     achLastMonth: -73.33,
     progressData: [
-      { status: "PENDING BASO", percentage: 43.5, color: "#4169E1" },
-      { status: "IN PROGRESS", percentage: 28.5, color: "#FFA500" },
-      { status: "COMPLETE", percentage: 20.6, color: "#32CD32" },
-      { status: "PENDING BILLING APROVAL", percentage: 7.4, color: "#DC3545" },
+      { status: "PENDING BASO", percentage: totalOrders ? (progress["PENDING BASO"] / totalOrders) * 100 : 0, color: "#4169E1" },
+      { status: "IN PROGRESS", percentage: totalOrders ? (progress["IN PROGRESS"] / totalOrders) * 100 : 0, color: "#FFA500" },
+      { status: "COMPLETE", percentage: totalOrders ? (progress.COMPLETE / totalOrders) * 100 : 0, color: "#32CD32" },
+      { status: "PENDING BILLING APROVAL", percentage: totalOrders ? (progress["PENDING BILLING APROVAL"] / totalOrders) * 100 : 0, color: "#DC3545" },
     ],
     monthlyData: [
       { month: "Jan 2025", totalOrders: 159, achPercentage: 0 },
