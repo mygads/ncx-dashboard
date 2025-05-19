@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import Image from "next/image"
 import { Chart, registerables } from "chart.js"
+import { DynamicHeader } from "@/components/dashboard/dinamic-header"
 Chart.register(...registerables)
 
 export default function AnalyticsDashboard() {
@@ -42,6 +42,13 @@ export default function AnalyticsDashboard() {
       { month: "Oct 2025", totalOrders: 0, achPercentage: 0 },
       { month: "Nov 2025", totalOrders: 0, achPercentage: 0 },
       { month: "Dec 2025", totalOrders: 0, achPercentage: 0 },
+    ],
+    hotdaData: [
+      { location: "INNER - PALU", count: 113, lat: -0.9002, lng: 119.8779 },
+      { location: "NORTH SULAWESI", count: 42, lat: 1.4748, lng: 124.842 },
+      { location: "CENTRAL SULAWESI", count: 35, lat: -1.43, lng: 121.4456 },
+      { location: "SOUTH SULAWESI", count: 28, lat: -5.1477, lng: 119.4327 },
+      { location: "WEST SULAWESI", count: 18, lat: -2.8441, lng: 119.2321 },
     ],
   }
 
@@ -190,21 +197,81 @@ export default function AnalyticsDashboard() {
     }
   }, [data.monthlyData])
 
+  // Initialize Google Maps
+  useEffect(() => {
+    // Load Google Maps API script
+    const loadGoogleMapsScript = () => {
+      const script = document.createElement("script")
+      script.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap`
+      script.async = true
+      script.defer = true
+      document.head.appendChild(script)
+
+      // Define the global initMap function
+      window.initMap = () => {
+        const mapElement = document.getElementById("google-map")
+        if (mapElement) {
+          // Center on Sulawesi
+          const map = new google.maps.Map(mapElement, {
+            center: { lat: -1.8312, lng: 120.0381 },
+            zoom: 6,
+            mapTypeId: "satellite",
+          })
+
+          // Add markers for each HOTDA
+          data.hotdaData.forEach((location) => {
+            const marker = new google.maps.Marker({
+              position: { lat: location.lat, lng: location.lng },
+              map: map,
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: Math.sqrt(location.count) * 0.5,
+                fillColor: "#FFFFFF",
+                fillOpacity: 0.6,
+                strokeWeight: 0.5,
+                strokeColor: "#000000",
+              },
+            })
+
+            // Add info window
+            const infoWindow = new google.maps.InfoWindow({
+              content: `
+                <div style="padding: 10px; text-align: center;">
+                  <strong>${location.location}</strong><br>
+                  Total: ${location.count}
+                </div>
+              `,
+            })
+
+            marker.addListener("click", () => {
+              infoWindow.open(map, marker)
+            })
+          })
+        }
+      }
+    }
+
+    // Check if Google Maps API is already loaded
+    if (window.google && window.initMap) {
+      // If already loaded, just initialize the map
+      window.initMap()
+    } else {
+      loadGoogleMapsScript()
+    }
+
+    return () => {
+      // Clean up
+      if (typeof window.initMap === 'function') { // Check if initMap is a function before reassigning
+        window.initMap = () => {};
+      }
+      window.google = undefined;
+    }
+  }, [data.hotdaData])
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="bg-red-600 text-white p-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold">Insight Dashboard NCX-PRO SULBAGTENG 2025 | Dashboard</h1>
-        <div className="flex items-center">
-          <Image
-            src="/placeholder.svg?height=40&width=280"
-            alt="Telkom Indonesia"
-            width={280}
-            height={40}
-            className="bg-white rounded-full p-1"
-          />
-        </div>
-      </div>
+      <DynamicHeader />
 
       {/* Dashboard Content */}
       <div className="p-6 space-y-6 bg-gray-50 flex-1">
@@ -303,17 +370,19 @@ export default function AnalyticsDashboard() {
             </Card>
           </div>
 
-          {/* Map */}
+          {/* Google Maps */}
           <Card className="col-span-2">
             <CardContent className="p-4">
               <h2 className="text-lg font-medium mb-4">Jumlah Orders berdasarkan HOTDA</h2>
-              <div className="h-[300px] w-full relative">
-                <Image
-                  src="/placeholder.svg?height=300&width=600"
-                  alt="Map of Sulawesi"
-                  fill
-                  className="object-cover rounded-lg"
-                />
+              <div id="google-map" className="h-[300px] w-full rounded-lg overflow-hidden"></div>
+              <div className="mt-2 text-xs text-gray-500 flex items-center justify-between">
+                <div>Total: 4</div>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 rounded-full bg-gray-400 mr-1"></div>
+                  <div className="w-4 h-4 rounded-full bg-gray-400 mr-1"></div>
+                  <div className="w-6 h-6 rounded-full bg-gray-400 mr-1"></div>
+                  <span>113</span>
+                </div>
               </div>
             </CardContent>
           </Card>

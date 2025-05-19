@@ -21,6 +21,25 @@ export default function DashboardLayout({
   const [isMounted, setIsMounted] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(true)
   const supabase = createClientComponentClient()
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+  useEffect(() => {
+    // Check if sidebar is collapsed from localStorage
+    const storedCollapsed = localStorage.getItem("sidebar-collapsed")
+    if (storedCollapsed) {
+      setSidebarCollapsed(storedCollapsed === "true")
+    }
+
+    // Listen for changes to localStorage
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "sidebar-collapsed") {
+        setSidebarCollapsed(e.newValue === "true")
+      }
+    }
+
+    window.addEventListener("storage", handleStorageChange)
+    return () => window.removeEventListener("storage", handleStorageChange)
+  }, [])
 
   useEffect(() => {
     setIsMounted(true)
@@ -55,17 +74,39 @@ export default function DashboardLayout({
   return (
     <div className="h-screen overflow-hidden flex">
       {/* Sidebar - fixed width on desktop, hidden on mobile */}
-      <div className="hidden md:block w-64 h-full overflow-y-auto">
-        <Sidebar />
+      <div
+        className={`hidden md:block h-full overflow-y-auto transition-all duration-300 ${sidebarCollapsed ? "w-16" : "w-64"}`}
+      >
+        <Sidebar collapsed={sidebarCollapsed} onCollapseChange={setSidebarCollapsed} />
       </div>
 
       {/* Main content */}
-      <main className="flex-1 overflow-y-auto bg-gray-50">
-        <div className="md:hidden flex items-center p-4 border-b">
+      <main className="flex-1 min-h-screen overflow-y-auto bg-gradient-to-br from-gray-50 via-white to-blue-50 relative">
+        {/* Decorative SVG top left */}
+        <svg className="absolute left-0 top-0 w-40 h-40 opacity-20 pointer-events-none" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="100" cy="100" r="100" fill="url(#paint0_radial)" />
+          <defs>
+            <radialGradient id="paint0_radial" cx="0" cy="0" r="1" gradientTransform="translate(100 100) scale(100)" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#60A5FA" />
+              <stop offset="1" stopColor="#fff" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+        </svg>
+        {/* Decorative SVG bottom right */}
+        <svg className="absolute right-0 bottom-0 w-40 h-40 opacity-20 pointer-events-none" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="0" y="0" width="200" height="200" rx="100" fill="url(#paint1_radial)" />
+          <defs>
+            <radialGradient id="paint1_radial" cx="0" cy="0" r="1" gradientTransform="translate(100 100) scale(100)" gradientUnits="userSpaceOnUse">
+              <stop stopColor="#818CF8" />
+              <stop offset="1" stopColor="#fff" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+        </svg>
+        <div className="md:hidden flex items-center p-4 border-b relative z-10">
           <MobileSidebar />
           <div className="ml-4 font-bold text-xl">NCX-PRO</div>
         </div>
-        {children}
+        <div className="relative z-10">{children}</div>
       </main>
 
       {process.env.NODE_ENV !== "production" && <DebugInfo />}
