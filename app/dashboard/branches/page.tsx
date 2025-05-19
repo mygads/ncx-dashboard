@@ -1,313 +1,441 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { StatCard } from "@/components/dashboard/stat-card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useEffect, useState, useRef } from "react"
+import { Card, CardContent } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Input } from "@/components/ui/input"
+import type { AMData, InsightData } from "@/lib/types"
+import { Chart, registerables } from "chart.js"
+import { ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { DynamicHeader } from "@/components/dashboard/dinamic-header"
+Chart.register(...registerables)
+
+// Fungsi untuk fetch data Branch Detail dari Google Sheets
+async function fetchBranchDetailData() {
+  const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
+  const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
+  const sheetName = 'BRANCH NCX';
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!json.values || json.values.length < 2) return [];
+  const rows = json.values.slice(1); // skip header
+  return rows.map((cols: string[]) => {
+    const name = cols[0] || "";
+    const total = Number(cols[1]) || 0;
+    const failed = Number(cols[2]) || 0;
+    const complete = Number(cols[9]) || 0;
+    let ach = cols[12] || "0";
+    ach = ach.replace(/%/g, "");
+    const achPercentage = Number(ach) || 0;
+    return { name, total, failed, complete, achPercentage };
+  });
+}
+
+// Fungsi untuk fetch insight Branch Detail dari Google Sheets
+async function fetchInsightBranchDetail() {
+  const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
+  const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
+  const sheetName = 'Update Text (Looker Studio)';
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!json.values || json.values.length < 1) return "";
+  const headers = json.values[0];
+  const idx = headers.findIndex((h: string) => h.toLowerCase().includes("insight branch"));
+  if (idx === -1) return "";
+  // Data insight ada di kolom ke-10 (idx + 1) pada baris header
+  return headers[idx + 1] || "";
+}
 
 export default function BranchDetailPage() {
-  const [selectedHOTDA, setSelectedHOTDA] = useState<string>("All")
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("MTD")
+  const [loading, setLoading] = useState(true)
+  const [branchData, setbranchData] = useState<any[]>([])
+  const [insightOrder, setInsightBranchs] = useState("")
+  const [selectedBranchs, setSelectedBranchs] = useState<string[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 
-  // Mock data based on the screenshot
-  const data = {
-    totalOrders: 223,
-    totalComplete: 35,
-    totalFailed: 0,
-    overallAchPercentage: 15.7,
-    branchData: [
-      { branch: "INNER - PALU", count: 106, percentage: 48.6 },
-      { branch: "POSO", count: 36, percentage: 20 },
-      { branch: "LUWUK", count: 34, percentage: 11.4 },
-      { branch: "MOROWALI", count: 20, percentage: 0 },
-      { branch: "GORONTALO", count: 15, percentage: 0 },
-      { branch: "TOLITOLI", count: 6, percentage: 0 },
-      { branch: "MARISA", count: 6, percentage: 0 },
-      { branch: "KWANDANG", count: 1, percentage: 0 },
-    ],
-    branchAchData: [
-      { branch: "INNER - PALU", total: 106, achPercentage: 15.09 },
-      { branch: "POSO", total: 36, achPercentage: 0 },
-      { branch: "LUWUK", total: 34, achPercentage: 11.76 },
-      { branch: "MOROWALI", total: 20, achPercentage: 35 },
-      { branch: "GORONTALO", total: 15, achPercentage: 26.67 },
-      { branch: "TOLITOLI", total: 6, achPercentage: 0 },
-      { branch: "MARISA", total: 6, achPercentage: 33.33 },
-      { branch: "KWANDANG", total: 1, achPercentage: 0 },
-    ],
-    datelInfo: {
-      name: "LUWUK",
-      area: "Luwuk Banggai, Bangkep, Balut",
-      manager: "AGUSTINUS KOMBER",
-      nik: "700642",
-    },
+  const barChartRef = useRef<HTMLCanvasElement>(null)
+  const pieChartRef = useRef<HTMLCanvasElement>(null)
+  const achChartRef = useRef<HTMLCanvasElement>(null)
+
+  // Fetch data on component mount
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true)
+      try {
+        const [branchDataResult, insightBranchResult] = await Promise.all([
+          fetchBranchDetailData(), fetchInsightBranchDetail()
+        ])
+        setbranchData(branchDataResult)
+        setInsightBranchs(insightBranchResult || "")
+        setSelectedBranchs((branchDataResult as { name: string }[]).map((o) => o.name))
+      } catch (error) {
+        console.error("Error fetching data:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
+
+  // Sort orders by total order descending for selection panel
+  const sortedOrders = [...branchData].sort((a, b) => b.total - a.total);
+  // Filter orders based on search term (from sorted list)
+  const filteredOrders = sortedOrders.filter((o) => o.name.toLowerCase().includes(searchTerm.toLowerCase()))
+  // Get data for selected orders
+  const selectedBranchsData = branchData.filter((o) => selectedBranchs.includes(o.name))
+  // Calculate totals for selected orders
+  const totalOrders = selectedBranchsData.reduce((sum, o) => sum + o.total, 0)
+  const totalComplete = selectedBranchsData.reduce((sum, o) => sum + o.complete, 0)
+  const totalFailed = selectedBranchsData.reduce((sum, o) => sum + o.failed, 0)
+  const overallAchPercentage = totalOrders > 0 ? ((totalComplete / totalOrders) * 100).toFixed(2) : "0.00"
+
+  // Toggle branch selection
+  const toggleBranch = (name: string) => {
+    if (selectedBranchs.includes(name)) {
+      setSelectedBranchs(selectedBranchs.filter((o) => o !== name))
+    } else {
+      setSelectedBranchs([...selectedBranchs, name])
+    }
+  }
+  // Select all orders
+  const selectAllOrders = () => {
+    setSelectedBranchs(branchData.map((o) => o.name))
+  }
+  // Clear all selections
+  const clearAllOrders = () => {
+    setSelectedBranchs([])
+  }
+
+  // Update charts when selected orders change
+  useEffect(() => {
+    updateBarChart()
+    updatePieChart()
+    updateAchChart()
+  }, [selectedBranchs])
+
+  // Bar chart for total orders
+  const updateBarChart = () => {
+    if (!barChartRef.current) return
+    const ctx = barChartRef.current.getContext("2d")
+    if (!ctx) return
+    const chartInstance = Chart.getChart(barChartRef.current)
+    if (chartInstance) chartInstance.destroy()
+    const sortedData = [...selectedBranchsData].sort((a, b) => b.total - a.total)
+    new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: sortedData.map((o) => o.name),
+        datasets: [
+          {
+            label: "Total Orders",
+            data: sortedData.map((o) => o.total),
+            backgroundColor: sortedData.map((_, i) => getColorByIndex(i)),
+            borderWidth: 0,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            title: { display: true, text: "Total" },
+          },
+          x: {
+            title: { display: true, text: "Branch" },
+          },
+        },
+        plugins: { legend: { display: false } },
+      },
+    })
+  }
+
+  // Pie chart for completion percentage
+  const updatePieChart = () => {
+    if (!pieChartRef.current) return
+    const ctx = pieChartRef.current.getContext("2d")
+    if (!ctx) return
+    const pieChartInstance = Chart.getChart(pieChartRef.current)
+    if (pieChartInstance) pieChartInstance.destroy()
+    const totalCompletionsAll = selectedBranchsData.reduce((sum, o) => sum + o.complete, 0)
+    const sortedForPie = [...selectedBranchsData].sort((a, b) => {
+      const pa = totalCompletionsAll > 0 ? (a.complete / totalCompletionsAll) * 100 : 0;
+      const pb = totalCompletionsAll > 0 ? (b.complete / totalCompletionsAll) * 100 : 0;
+      return pb - pa;
+    });
+    const labels = sortedForPie.map((o) => o.name)
+    const dataPie = sortedForPie.map((o) => totalCompletionsAll > 0 ? (o.complete / totalCompletionsAll) * 100 : 0)
+    new Chart(ctx, {
+      type: "pie",
+      data: {
+        labels,
+        datasets: [
+          {
+            data: dataPie,
+            backgroundColor: labels.map((_, i) => getColorByIndex(i)),
+            borderWidth: 0
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: "right",
+            labels: {
+              usePointStyle: true,
+              pointStyle: "circle",
+              padding: 20,
+              font: { size: 12 }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: (context) => `${context.label}: ${Number(context.raw).toFixed(1)}%`
+            }
+          }
+        },
+        animation: {
+          onComplete: function () {
+            const chart = this as Chart;
+            const ctx = chart.ctx;
+            ctx.save();
+            chart.getDatasetMeta(0).data.forEach((arc: any, i: number) => {
+              const dataset = chart.data.datasets[0];
+              const value = dataset.data[i];
+              if (typeof value === 'number' && value > 10) {
+                const props = arc.getProps(['startAngle', 'endAngle', 'outerRadius', 'innerRadius', 'x', 'y'], true);
+                const midAngle = (props.startAngle + props.endAngle) / 2;
+                const radius = (props.outerRadius + props.innerRadius) / 2;
+                const x = props.x + Math.cos(midAngle) * radius * 0.7;
+                const y = props.y + Math.sin(midAngle) * radius * 0.7;
+                ctx.fillStyle = '#222';
+                ctx.font = 'bold 16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`${Math.round(value)}%`, x, y);
+              }
+            });
+            ctx.restore();
+          }
+        }
+      }
+    });
+  }
+
+  // Achievement chart
+  const updateAchChart = () => {
+    if (!achChartRef.current) return
+    const ctx = achChartRef.current.getContext("2d")
+    if (!ctx) return
+    const chartInstance = Chart.getChart(achChartRef.current)
+    if (chartInstance) chartInstance.destroy()
+    const sortedData = [...selectedBranchsData].sort((a, b) => b.total - a.total)
+    new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: sortedData.map((o) => o.name),
+        datasets: [
+          {
+            type: "bar",
+            label: "Total",
+            data: sortedData.map((o) => o.total),
+            backgroundColor: "#FF6347",
+            order: 1,
+            yAxisID: "y",
+          },
+          {
+            type: "line",
+            label: "% ACH",
+            data: sortedData.map((o) => o.achPercentage),
+            borderColor: "#800080",
+            borderWidth: 2,
+            pointBackgroundColor: "#800080",
+            pointRadius: 4,
+            fill: false,
+            order: 0,
+            yAxisID: "y1",
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: { type: "linear", position: "left", beginAtZero: true, title: { display: true, text: "Total" } },
+          y1: { type: "linear", position: "right", beginAtZero: true, max: 100, title: { display: true, text: "% ACH" }, grid: { drawOnChartArea: false } },
+          x: { title: { display: true, text: "Branch" } },
+        },
+      },
+    })
+  }
+
+  // Helper function to get color by index
+  const getColorByIndex = (index: number) => {
+    const colors = [
+      "#333333", "#4B0082", "#006400", "#FF1493", "#FF4500", "#32CD32", "#FF8C00", "#1E90FF", "#8B008B", "#2F4F4F", "#FFD700", "#00CED1", "#DC143C", "#A0522D", "#20B2AA", "#B22222", "#FF6347", "#4682B4", "#008B8B", "#B8860B", "#C71585", "#556B2F", "#8B0000", "#483D8B", "#008080", "#BDB76B", "#9932CC", "#FF00FF", "#00FF7F", "#191970", "#FFA07A", "#7CFC00", "#D2691E", "#6495ED", "#40E0D0", "#FFB6C1", "#A9A9A9", "#F08080", "#E9967A", "#00FA9A", "#8FBC8F", "#CD5C5C", "#BA55D3", "#B0C4DE", "#FFDAB9", "#E6E6FA", "#B0E0E6", "#D8BFD8", "#DDA0DD", "#F5DEB3", "#FFFACD", "#F0E68C", "#E0FFFF", "#FAFAD2", "#FFE4E1", "#F5F5DC", "#FFF0F5", "#F5FFFA", "#F0FFF0", "#F8F8FF", "#FFF5EE", "#F5F5F5", "#FDF5E6", "#FFFAFA", "#FFFFF0", "#FAEBD7", "#FFE4B5", "#FFEBCD", "#FFEFD5", "#FFF8DC"
+    ];
+    return colors[index % colors.length];
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-full">
+        <DynamicHeader />
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 text-red-600">TARGET WBS DATEL {data.datelInfo.name} 2025</h1>
-          <p className="text-xl font-semibold">Area: {data.datelInfo.area}</p>
-        </div>
-        <div className="flex gap-4">
-          <div className="w-full md:w-40">
-            <Select value={selectedHOTDA} onValueChange={setSelectedHOTDA}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="HOTDA" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All HOTDAs</SelectItem>
-                {data.branchData.map((item) => (
-                  <SelectItem key={item.branch} value={item.branch}>
-                    {item.branch}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <div className="flex flex-col h-full">
+      <DynamicHeader />
+      <div className="p-6 space-y-6 bg-gray-50 flex-1">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <span className="font-medium">Update</span>
+            <span className="text-red-600 border-b-2 border-red-600">19 Mei 2025</span>
           </div>
-          <div className="w-full md:w-32">
-            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Period" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="MTD">MTD</SelectItem>
-                <SelectItem value="YTD">YTD</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="text-right">
+            <span className="text-red-600 font-medium">Month to Date</span>
           </div>
         </div>
-      </div>
-
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="details">Details</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <div className="flex items-center justify-center h-[400px]">
-            <div className="text-center">
-              <h2 className="text-5xl font-bold mb-4">COMING SOON</h2>
-              <p className="text-xl text-gray-500">This section is under development</p>
-              <div className="mt-8 p-4 bg-red-600 text-white inline-block rounded-lg">
-                <p className="font-bold">{data.datelInfo.manager}</p>
-                <p>NIK: {data.datelInfo.nik}</p>
-              </div>
-            </div>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="performance" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard title="Total Orders" value={data.totalOrders} className="bg-blue-600 text-white" />
-            <StatCard title="Total Complete" value={data.totalComplete} className="bg-green-600 text-white" />
-            <StatCard title="Total Failed" value={data.totalFailed} className="bg-red-600 text-white" />
-            <StatCard
-              title="Overall % ACH"
-              value={`${data.overallAchPercentage}%`}
-              className="bg-orange-500 text-white"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Branch Distribution</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="h-[300px] w-full">
-                  <BranchBarChart data={data.branchData} />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Complete (%)</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="h-[300px] w-full">
-                  <BranchPieChart data={data.branchData} />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-medium">Branch Achievement</CardTitle>
-            </CardHeader>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          <Card className="bg-blue-600 text-white">
             <CardContent className="p-4">
-              <div className="h-[300px] w-full">
-                <BranchAchievementChart data={data.branchAchData} />
+              <div className="text-sm font-medium">Total Orders</div>
+              <div className="text-3xl font-bold mt-1">{totalOrders}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-green-600 text-white">
+            <CardContent className="p-4">
+              <div className="text-sm font-medium">Total Complete</div>
+              <div className="text-3xl font-bold mt-1">{totalComplete}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-red-600 text-white">
+            <CardContent className="p-4">
+              <div className="text-sm font-medium">Total Failed</div>
+              <div className="text-3xl font-bold mt-1">{totalFailed}</div>
+            </CardContent>
+          </Card>
+          <Card className="bg-orange-500 text-white">
+            <CardContent className="p-4">
+              <div className="text-sm font-medium">Overall % ACH</div>
+              <div className="text-3xl font-bold mt-1">{overallAchPercentage}%</div>
+            </CardContent>
+          </Card>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <Card>
+                <CardContent className="p-4">
+                  <h2 className="text-lg font-medium mb-4">Branch Distribution</h2>
+                  <div className="h-[300px] w-full">
+                    <canvas ref={barChartRef} />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <h2 className="text-lg font-medium mb-4">Complete (%)</h2>
+                  <div className="h-[300px] w-full">
+                    <canvas ref={pieChartRef} />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            <Card>
+              <CardContent className="p-4">
+                <h2 className="text-lg font-medium mb-4">Branch Achievement</h2>
+                <div className="h-[300px] w-full">
+                  <canvas ref={achChartRef} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          <div className="lg:col-span-1">
+            <Card className="h-full">
+              <div className="bg-red-600 text-white p-3 flex justify-between items-center">
+                <div className="flex items-center">
+                  <Checkbox
+                    checked={selectedBranchs.length === sortedOrders.length && sortedOrders.length > 0}
+                    onCheckedChange={() => {
+                      if (selectedBranchs.length === sortedOrders.length) {
+                        setSelectedBranchs([])
+                      } else {
+                        setSelectedBranchs(sortedOrders.map((o) => o.name))
+                      }
+                    }}
+                    className="mr-2"
+                  />
+                  <span>Branch ({selectedBranchs.length})</span>
+                </div>
+                <span>Total</span>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="details" className="space-y-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-medium">Insight Branch</CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 prose max-w-none">
-              <p className="text-base">
-                <strong>[Update 13 May 2025, 12:00 WITA]</strong>
-              </p>
-              <p className="text-base">
-                Capaian antar cabang NCX sangat bervariasi, terlihat dari perbedaan signifikan jumlah HOTDA yang
-                berhasil diselesaikan. Cabang dengan HOTDA besar seperti INNER - PALU terkendala pada jumlah "Pending
-                BASO" yang tinggi, sementara cabang lain seperti POSO terhambat oleh "Provision Start" yang belum
-                ditangani. Selain itu, beberapa cabang seperti TOLITOLI memiliki persentase ACH yang sangat rendah.
-              </p>
-              <p className="text-base">
-                Untuk perbaikan cepat, cabang-cabang disarankan untuk melakukan *follow-up* intensif pada status
-                "Pending BASO" atau "Provision Start" untuk mempercepat proses penyelesaian HOTDA.
-              </p>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Top Performing Branches</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="space-y-4">
-                  {data.branchAchData
-                    .filter((branch) => branch.achPercentage > 0)
-                    .sort((a, b) => b.achPercentage - a.achPercentage)
-                    .slice(0, 5)
-                    .map((branch, index) => (
-                      <div key={branch.branch} className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <div className="w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center mr-3">
-                            {index + 1}
-                          </div>
-                          <span>{branch.branch}</span>
-                        </div>
-                        <div className="font-bold">{branch.achPercentage}%</div>
-                      </div>
-                    ))}
+              <div className="p-2 bg-gray-100">
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Type to search"
+                    className="pl-8"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium">Branches Needing Attention</CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                <div className="space-y-4">
-                  {data.branchAchData
-                    .filter((branch) => branch.achPercentage === 0)
-                    .sort((a, b) => b.total - a.total)
-                    .slice(0, 5)
-                    .map((branch, index) => (
-                      <div key={branch.branch} className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <div className="w-6 h-6 rounded-full bg-gray-400 text-white flex items-center justify-center mr-3">
-                            {index + 1}
-                          </div>
-                          <span>{branch.branch}</span>
-                        </div>
-                        <div className="font-bold text-red-600">{branch.total} orders</div>
-                      </div>
-                    ))}
+              </div>
+              <div className="overflow-auto max-h-[500px]">
+                {filteredOrders.map((o) => (
+                  <div key={o.name} className="flex items-center justify-between p-2 border-b">
+                    <div className="flex items-center">
+                      <Checkbox
+                        checked={selectedBranchs.includes(o.name)}
+                        onCheckedChange={() => toggleBranch(o.name)}
+                        className="mr-2"
+                      />
+                      <span>{o.name}</span>
+                    </div>
+                    <span className="font-medium">{o.total}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="p-4 border-t">
+                <div className="flex justify-between items-center">
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                      className="p-1 border rounded"
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => setCurrentPage((prev) => prev + 1)} className="p-1 border rounded">
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="text-sm text-gray-500">1 - 1 / 1</div>
                 </div>
-              </CardContent>
+              </div>
             </Card>
           </div>
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
-}
-
-// Mock chart components - in a real implementation, these would use Chart.js
-function BranchBarChart({ data }: { data: { branch: string; count: number; percentage: number }[] }) {
-  return (
-    <div className="flex h-full items-end justify-between gap-2 overflow-x-auto pb-4">
-      {data.map((item) => (
-        <div key={item.branch} className="flex flex-col items-center">
-          <div
-            className="w-10 rounded-t"
-            style={{ height: `${(item.count / 150) * 100}%`, backgroundColor: getBranchColor(item.branch) }}
-          ></div>
-          <div className="mt-2 text-xs font-medium rotate-45 origin-top-left">{item.branch.substring(0, 10)}</div>
-          <div className="text-xs text-gray-500">{item.count}</div>
         </div>
-      ))}
-    </div>
-  )
-}
-
-function BranchPieChart({ data }: { data: { branch: string; count: number; percentage: number }[] }) {
-  return (
-    <div className="flex h-full items-center justify-center">
-      <div className="relative h-48 w-48 rounded-full border-8 border-transparent">
-        <div
-          className="absolute inset-0 rounded-full"
-          style={{
-            background: `conic-gradient(
-              ${getBranchColor("INNER - PALU")} 0% 48.6%, 
-              ${getBranchColor("POSO")} 48.6% 68.6%, 
-              ${getBranchColor("LUWUK")} 68.6% 80%, 
-              ${getBranchColor("MOROWALI")} 80% 100%
-            )`,
-          }}
-        ></div>
-      </div>
-      <div className="ml-8 space-y-1 max-h-[300px] overflow-y-auto">
-        {data.map((item) => (
-          <div key={item.branch} className="flex items-center">
-            <div className="h-3 w-3 rounded-full mr-2" style={{ backgroundColor: getBranchColor(item.branch) }}></div>
-            <span className="text-xs">
-              {item.branch} ({item.percentage}%)
-            </span>
-          </div>
-        ))}
+        <Card>
+          <CardContent className="p-4 prose max-w-none">
+            <h2 className="text-lg font-medium">Insight Branch</h2>
+            <p className="text-base">{insightOrder}</p>
+          </CardContent>
+        </Card>
+        <div className="text-xs text-gray-500">Data Last Updated: {lastUpdated.toLocaleString()} | Privacy Policy</div>
       </div>
     </div>
   )
-}
-
-function BranchAchievementChart({ data }: { data: { branch: string; total: number; achPercentage: number }[] }) {
-  return (
-    <div className="flex h-full items-end justify-between gap-1 overflow-x-auto pb-4">
-      {data.map((item) => (
-        <div key={item.branch} className="flex flex-col items-center">
-          <div className="w-10 bg-red-500 rounded-t" style={{ height: `${(item.total / 150) * 100}%` }}></div>
-          <div className="mt-2 text-xs font-medium rotate-45 origin-top-left">{item.branch.substring(0, 10)}</div>
-          <div className="text-xs text-gray-500">{item.achPercentage}%</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function getBranchColor(branch: string): string {
-  switch (branch) {
-    case "INNER - PALU":
-      return "#000000" // Black
-    case "POSO":
-      return "#800000" // Maroon
-    case "LUWUK":
-      return "#FF0000" // Red
-    case "MOROWALI":
-      return "#800080" // Purple
-    case "GORONTALO":
-      return "#FF6666" // Light Red
-    case "TOLITOLI":
-      return "#808080" // Gray
-    case "MARISA":
-      return "#C0C0C0" // Silver
-    case "KWANDANG":
-      return "#FFFF00" // Yellow
-    default:
-      return "#CCCCCC"
-  }
 }
