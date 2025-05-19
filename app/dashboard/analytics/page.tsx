@@ -82,6 +82,46 @@ async function fetchUnitSummary() {
   };
 }
 
+// Fungsi untuk fetch data dari sheet YTDProgress NCX
+async function fetchYTDProgress() {
+  const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
+  const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
+  const sheetName = 'YTDProgress NCX';
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!json.values || json.values.length < 2) return { monthlyData: [], ordersCompleteYTD: 0, achLastMonth: 0 };
+  const rows = json.values.slice(1); // skip header
+  // Ambil tahun sekarang
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1; // 1-based
+  // Filter hanya 12 bulan di tahun ini
+  const filteredRows = rows.filter((cols: string[]) => {
+    const [year, month] = (cols[0] || '').split('-');
+    return Number(year) === currentYear && Number(month) >= 1 && Number(month) <= 12;
+  }).slice(0, 12);
+  let ordersCompleteYTD = 0;
+  let achLastMonth = 0;
+  const monthlyData = filteredRows.map((cols: string[], idx: number) => {
+    const month = cols[0] || "";
+    let totalOrders = Number(cols[1]);
+    let achPercentage = Number(cols[2]);
+    if (isNaN(totalOrders)) totalOrders = 0;
+    if (isNaN(achPercentage)) achPercentage = 0;
+    ordersCompleteYTD += totalOrders;
+    // Ambil Ach Last Month (bulan sebelumnya dari bulan sekarang)
+    const [year, monthNum] = month.split("-");
+    if (Number(monthNum) === currentMonth - 1) {
+      achLastMonth = achPercentage;
+    }
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let monthLabel = monthNames[Number(monthNum) - 1] + " " + year;
+    return { month: monthLabel, totalOrders, achPercentage };
+  });
+  return { monthlyData, ordersCompleteYTD, achLastMonth };
+}
+
 export default function AnalyticsDashboard() {
   const [loading, setLoading] = useState(false)
   const pieChartRef = useRef<HTMLCanvasElement>(null)
@@ -97,11 +137,13 @@ export default function AnalyticsDashboard() {
   });
 
   const [unitSummary, setUnitSummary] = useState({ totalFailed: 0, overallAchPercentage: 0 });
+  const [ytdProgress, setYtdProgress] = useState({ monthlyData: [], ordersCompleteYTD: 0, achLastMonth: 0 });
 
   // Fetch data dari Google Sheets saat mount
   useEffect(() => {
     fetchProgressData().then(setProgress);
     fetchUnitSummary().then(setUnitSummary);
+    fetchYTDProgress().then(setYtdProgress);
   }, []);
 
   // Build data object using progress
@@ -114,20 +156,20 @@ export default function AnalyticsDashboard() {
     totalComplete: progress.COMPLETE,
     totalFailed: unitSummary.totalFailed,
     overallAchPercentage: unitSummary.overallAchPercentage.toFixed(2),
-    ordersCompleteYTD: 949,
-    achLastMonth: -73.33,
+    ordersCompleteYTD: ytdProgress.ordersCompleteYTD,
+    achLastMonth: ytdProgress.achLastMonth,
     progressData: [
       { status: "PENDING BASO", percentage: totalOrders ? (progress["PENDING BASO"] / totalOrders) * 100 : 0, color: "#4169E1" },
       { status: "IN PROGRESS", percentage: totalOrders ? (progress["IN PROGRESS"] / totalOrders) * 100 : 0, color: "#FFA500" },
       { status: "COMPLETE", percentage: totalOrders ? (progress.COMPLETE / totalOrders) * 100 : 0, color: "#32CD32" },
       { status: "PENDING BILLING APROVAL", percentage: totalOrders ? (progress["PENDING BILLING APROVAL"] / totalOrders) * 100 : 0, color: "#DC3545" },
     ],
-    monthlyData: [
-      { month: "Jan 2025", totalOrders: 159, achPercentage: 0 },
-      { month: "Feb 2025", totalOrders: 213, achPercentage: 41 },
-      { month: "Mar 2025", totalOrders: 330, achPercentage: 0 },
-      { month: "Apr 2025", totalOrders: 195, achPercentage: -79 },
-      { month: "May 2025", totalOrders: 52, achPercentage: -100 },
+    monthlyData: ytdProgress.monthlyData.length ? ytdProgress.monthlyData : [
+      { month: "Jan 2025", totalOrders: 0, achPercentage: 0 },
+      { month: "Feb 2025", totalOrders: 0, achPercentage: 0 },
+      { month: "Mar 2025", totalOrders: 0, achPercentage: 0 },
+      { month: "Apr 2025", totalOrders: 0, achPercentage: 0 },
+      { month: "May 2025", totalOrders: 0, achPercentage: 0 },
       { month: "Jun 2025", totalOrders: 0, achPercentage: 0 },
       { month: "Jul 2025", totalOrders: 0, achPercentage: 0 },
       { month: "Aug 2025", totalOrders: 0, achPercentage: 0 },
@@ -155,9 +197,8 @@ export default function AnalyticsDashboard() {
   }
 
   useEffect(() => {
-    // Create pie chart
     if (pieChartRef.current) {
-      const ctx = pieChartRef.current.getContext("2d")
+      const ctx = pieChartRef.current.getContext("2d");
       if (ctx) {
         const pieChart = new Chart(ctx, {
           type: "pie",
@@ -165,7 +206,7 @@ export default function AnalyticsDashboard() {
             labels: data.progressData.map((item) => item.status),
             datasets: [
               {
-                data: data.progressData.map((item) => item.percentage),
+                data: data.progressData.map((item) => Math.round(item.percentage)),
                 backgroundColor: data.progressData.map((item) => item.color),
                 borderWidth: 0,
               },
@@ -188,19 +229,43 @@ export default function AnalyticsDashboard() {
               },
               tooltip: {
                 callbacks: {
-                  label: (context) => `${context.label}: ${context.raw}%`,
+                  label: (context: any) => `${context.label}: ${Math.round(Number(context.raw))}%`,
                 },
               },
             },
+            animation: {
+              onComplete: function () {
+                const chart = this as Chart;
+                const ctx = chart.ctx;
+                ctx.save();
+                chart.getDatasetMeta(0).data.forEach((arc: any, i: number) => {
+                  const dataset = chart.data.datasets[0];
+                  const value = dataset.data[i];
+                  if (typeof value === 'number' && value > 0) {
+                    // Chart.js v3+ arc geometry
+                    const props = arc.getProps(['startAngle', 'endAngle', 'outerRadius', 'innerRadius', 'x', 'y'], true);
+                    const midAngle = (props.startAngle + props.endAngle) / 2;
+                    const radius = (props.outerRadius + props.innerRadius) / 2;
+                    const x = props.x + Math.cos(midAngle) * radius * 0.7;
+                    const y = props.y + Math.sin(midAngle) * radius * 0.7;
+                    ctx.fillStyle = '#222';
+                    ctx.font = 'bold 16px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`${value}%`, x, y);
+                  }
+                });
+                ctx.restore();
+              }
+            }
           },
-        })
-
+        });
         return () => {
-          pieChart.destroy()
-        }
+          pieChart.destroy();
+        };
       }
     }
-  }, [data.progressData])
+  }, [data.progressData]);
 
   useEffect(() => {
     // Create bar chart
