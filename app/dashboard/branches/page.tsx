@@ -55,7 +55,26 @@ export default function BranchDetailPage() {
   const [selectedBranchs, setSelectedBranchs] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+
+  // Fetch last updated time from Google Drive API metadata
+  useEffect(() => {
+    async function fetchLastUpdated() {
+      try {
+        const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
+        const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
+        const url = `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?fields=modifiedTime&key=${apiKey}`;
+        const res = await fetch(url);
+        const json = await res.json();
+        if (json?.modifiedTime) {
+          setLastUpdated(new Date(json.modifiedTime));
+        }
+      } catch (e) {
+        console.error("Error fetching last updated time:", e);
+      }
+    }
+    fetchLastUpdated();
+  }, []);
 
   const barChartRef = useRef<HTMLCanvasElement>(null)
   const pieChartRef = useRef<HTMLCanvasElement>(null)
@@ -302,7 +321,9 @@ export default function BranchDetailPage() {
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="font-medium">Update</span>
-            <span className="text-red-600 border-b-2 border-red-600">19 Mei 2025</span>
+            <span className="text-red-600 border-b-2 border-red-600">
+              {lastUpdated ? lastUpdated.toLocaleDateString() : "Loading..."}
+            </span>
           </div>
           <div className="text-right">
             <span className="text-red-600 font-medium">Month to Date</span>
@@ -434,7 +455,9 @@ export default function BranchDetailPage() {
             <p className="text-base">{insightOrder}</p>
           </CardContent>
         </Card>
-        <div className="text-xs text-gray-500">Data Last Updated: {lastUpdated.toLocaleString()} | Privacy Policy</div>
+        <div className="text-xs text-gray-500">
+          Data Last Updated: {lastUpdated ? lastUpdated.toLocaleString() : "Loading..."}
+        </div>
       </div>
     </div>
   )

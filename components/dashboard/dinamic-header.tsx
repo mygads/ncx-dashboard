@@ -37,24 +37,32 @@ export function DynamicHeader() {
   }
 
   return (
-    <div className="bg-red-600 text-white p-4 flex justify-between items-center">
-      <h1 className="text-xl font-bold">Insight Dashboard NCX-PRO SULBAGTENG 2025 | {getSubtitle()}</h1>
+    <div className="bg-red-600 text-white p-4 flex flex-col md:flex-row justify-between items-center gap-4">
+      <h1 className="text-lg md:text-xl font-bold text-center md:text-left">
+      Insight Dashboard NCX-PRO SULBAGTENG 2025 | {getSubtitle()}
+      </h1>
       <div className="flex items-center">
-        <div className="bg-white rounded-xl p-1 flex items-center">
-          <Image
-            src="/telkom-logo.png"
-            alt="Telkom Logo"
-            className="object-contain"
-            width={80}
-            height={30}
-          />
-          <Image
-            src="/ncs-logo.png"
-            alt="NCX Logo"
-            width={300}
-            height={30}
-            className="object-contain"
-          />
+        <div className="bg-white rounded-xl p-2 flex items-center">
+          <div className="relative w-20 h-8 md:w-24 md:h-10">
+            <Image
+              src="/telkom-logo.png"
+              alt="Telkom Logo"
+              fill
+              style={{ objectFit: "contain" }}
+              sizes="(max-width: 768px) 80px, 96px"
+              priority
+            />
+          </div>
+          <div className="relative w-32 h-8 md:w-48 md:h-10">
+            <Image
+              src="/ncs-logo.png"
+              alt="NCX Logo"
+              fill
+              style={{ objectFit: "contain" }}
+              sizes="(max-width: 768px) 128px, 192px"
+              priority
+            />
+          </div>
         </div>
       </div>
     </div>
