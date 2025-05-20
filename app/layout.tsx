@@ -8,9 +8,36 @@ import { ThemeProvider } from "@/components/theme-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "NCX-PRO Dashboard",
-  description: "Modern dashboard for NCX-PRO data visualization",
-    generator: 'v0.dev'
+  title: "TELKOM SULBAGTENG NCX-PRO Dashboard",
+  description: "Dashboard NCX data visualization TELKOM INDONESIA SULBAGTENG",
+  authors: [{ name: "TELKOM SULBAGTENG NCX" }],
+  keywords: ["TELKOM SULBAGTENG NCX", "dashboard", "data visualization", "NCX-PRO", "SULBAGTENG", "TELKOM INDONESIA", "SULAWESI", "TELKOM SULBAGTENG", "NCX", "PRO"],
+  publisher: "TELKOM SULBAGTENG",
+  applicationName: "TELKOM SULBAGTENG NCX-PRO Dashboard",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-snippet": -1,
+      "max-image-preview": "large",
+      "max-video-preview": -1,
+    },
+  },
+  creator: "TELKOM SULBAGTENG",
+  openGraph: {
+    title: "TELKOM SULBAGTENG NCX-PRO Dashboard",
+    description: "Dashboard NCX data visualization TELKOM INDONESIA SULBAGTENG",
+    siteName: "TELKOM SULBAGTENG NCX-PRO Dashboard",
+    locale: "id_ID",
+    type: "website",
+  },
+  icons: {
+    icon: "/icon-telkom.png",
+    shortcut: "/icon-telkom.png",
+    apple: "/icon-telkom.png",
+  },
 }
 
 export default function RootLayout({

@@ -14,7 +14,7 @@ Chart.register(...registerables)
 async function fetchImputerData() {
   const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
   const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
-  const sheetName = 'IMPUTER NCX';
+  const sheetName = 'INPUTER NCX';
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
   const res = await fetch(url);
   const json = await res.json();
@@ -42,7 +42,7 @@ async function fetchInsightImputer() {
   const json = await res.json();
   if (!json.values || json.values.length < 1) return "";
   const headers = json.values[0];
-  const idx = headers.findIndex((h: string) => h.toLowerCase().includes("insight imputer"));
+  const idx = headers.findIndex((h: string) => h.toLowerCase().includes("insight inputer"));
   if (idx === -1) return "";
   // Data insight ada di kolom ke-8 (idx + 1) pada baris header
   return headers[idx + 1] || "";
@@ -503,7 +503,7 @@ export default function ImputerPerformancePage() {
             {/* Achievement Chart */}
             <Card>
               <CardContent className="p-4">
-                <h2 className="text-lg font-medium mb-4">AM Achievement</h2>
+                <h2 className="text-lg font-medium mb-4">Imputer Achievement</h2>
                 <div className="h-[300px] w-full">
                   <canvas ref={achChartRef} />
                 </div>
