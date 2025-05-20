@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { createContext, useContext, useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
@@ -74,10 +73,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Wait for the session to be established
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      // await new Promise((resolve) => setTimeout(resolve, 500))
 
       router.push("/dashboard")
-      router.refresh()
+      // router.refresh()
     } catch (error) {
       throw error
     } finally {
@@ -132,8 +131,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true)
     try {
       await supabase.auth.signOut()
-      router.push("/login")
       router.refresh()
+      router.push("/login")
     } catch (error) {
       console.error("Error signing out:", error)
     } finally {

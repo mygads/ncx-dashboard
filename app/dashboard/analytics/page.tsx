@@ -124,7 +124,6 @@ async function fetchYTDProgress() {
 }
 
 export default function AnalyticsDashboard() {
-  const [loading, setLoading] = useState(false)
   const pieChartRef = useRef<HTMLCanvasElement>(null)
   const barChartRef = useRef<HTMLCanvasElement>(null)
 

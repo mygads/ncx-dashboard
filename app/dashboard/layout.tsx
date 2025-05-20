@@ -63,14 +63,6 @@ export default function DashboardLayout({
     checkAuth()
   }, [router, supabase.auth])
 
-  if (!isMounted || isLoading || checkingAuth) {
-    return (
-      <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-red-600" />
-      </div>
-    )
-  }
-
   return (
     <div className="h-screen overflow-hidden flex">
       {/* Sidebar - fixed width on desktop, hidden on mobile */}

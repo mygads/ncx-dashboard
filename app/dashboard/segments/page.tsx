@@ -9,6 +9,7 @@ import { Chart, registerables } from "chart.js"
 import { ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
 import { LastUpdatedDate, LastUpdatedFooter } from "@/components/dashboard/last-updated"
+import Loading from "@/components/ui/loading"
 Chart.register(...registerables)
 
 // Fungsi untuk fetch data Unit dari Google Sheets
@@ -426,9 +427,7 @@ export default function UnitSegmentPage() {
     return (
       <div className="flex flex-col h-full">
         <DynamicHeader />
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
-        </div>
+        <Loading />
       </div>
     )
   }
