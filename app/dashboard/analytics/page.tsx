@@ -347,74 +347,74 @@ export default function AnalyticsDashboard() {
   }, [data.monthlyData])
 
   // Initialize Google Maps
-  useEffect(() => {
-    // Load Google Maps API script
-    const loadGoogleMapsScript = () => {
-      const script = document.createElement("script")
-      script.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap`
-      script.async = true
-      script.defer = true
-      document.head.appendChild(script)
+  // useEffect(() => {
+  //   // Load Google Maps API script
+  //   const loadGoogleMapsScript = () => {
+  //     const script = document.createElement("script")
+  //     script.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap`
+  //     script.async = true
+  //     script.defer = true
+  //     document.head.appendChild(script)
 
-      // Define the global initMap function
-      window.initMap = () => {
-        const mapElement = document.getElementById("google-map")
-        if (mapElement) {
-          // Center on Sulawesi
-          const map = new google.maps.Map(mapElement, {
-            center: { lat: -1.8312, lng: 120.0381 },
-            zoom: 6,
-            mapTypeId: "satellite",
-          })
+  //     // Define the global initMap function
+  //     window.initMap = () => {
+  //       const mapElement = document.getElementById("google-map")
+  //       if (mapElement) {
+  //         // Center on Sulawesi
+  //         const map = new google.maps.Map(mapElement, {
+  //           center: { lat: -1.8312, lng: 120.0381 },
+  //           zoom: 6,
+  //           mapTypeId: "satellite",
+  //         })
 
-          // Add markers for each HOTDA
-          data.hotdaData.forEach((location) => {
-            const marker = new google.maps.Marker({
-              position: { lat: location.lat, lng: location.lng },
-              map: map,
-              icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: Math.sqrt(location.count) * 0.5,
-                fillColor: "#FFFFFF",
-                fillOpacity: 0.6,
-                strokeWeight: 0.5,
-                strokeColor: "#000000",
-              },
-            })
+  //         // Add markers for each HOTDA
+  //         data.hotdaData.forEach((location) => {
+  //           const marker = new google.maps.Marker({
+  //             position: { lat: location.lat, lng: location.lng },
+  //             map: map,
+  //             icon: {
+  //               path: google.maps.SymbolPath.CIRCLE,
+  //               scale: Math.sqrt(location.count) * 0.5,
+  //               fillColor: "#FFFFFF",
+  //               fillOpacity: 0.6,
+  //               strokeWeight: 0.5,
+  //               strokeColor: "#000000",
+  //             },
+  //           })
 
-            // Add info window
-            const infoWindow = new google.maps.InfoWindow({
-              content: `
-                <div style="padding: 10px; text-align: center;">
-                  <strong>${location.location}</strong><br>
-                  Total: ${location.count}
-                </div>
-              `,
-            })
+  //           // Add info window
+  //           const infoWindow = new google.maps.InfoWindow({
+  //             content: `
+  //               <div style="padding: 10px; text-align: center;">
+  //                 <strong>${location.location}</strong><br>
+  //                 Total: ${location.count}
+  //               </div>
+  //             `,
+  //           })
 
-            marker.addListener("click", () => {
-              infoWindow.open(map, marker)
-            })
-          })
-        }
-      }
-    }
+  //           marker.addListener("click", () => {
+  //             infoWindow.open(map, marker)
+  //           })
+  //         })
+  //       }
+  //     }
+  //   }
 
-    // Check if Google Maps API is already loaded
-    if (window.google && window.initMap) {
-      // If already loaded, just initialize the map
-      window.initMap()
-    } else {
-      loadGoogleMapsScript()
-    }    return () => {
-      // Clean up
-      if (window.google && typeof window.initMap === 'function') {
-        window.initMap = () => {};
-        // @ts-ignore
-        window.google = undefined;
-      }
-    }
-  }, [data.hotdaData])
+  //   // Check if Google Maps API is already loaded
+  //   if (window.google && window.initMap) {
+  //     // If already loaded, just initialize the map
+  //     window.initMap()
+  //   } else {
+  //     loadGoogleMapsScript()
+  //   }    return () => {
+  //     // Clean up
+  //     if (window.google && typeof window.initMap === 'function') {
+  //       window.initMap = () => {};
+  //       // @ts-ignore
+  //       window.google = undefined;
+  //     }
+  //   }
+  // }, [data.hotdaData])
 
   return (
     <div className="flex flex-col h-full">

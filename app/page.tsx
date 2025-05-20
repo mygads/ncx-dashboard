@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Wifi, Signal, Phone, Globe, Network } from 'lucide-react'
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
 export default function Home() {
   const [email, setEmail] = useState("")
@@ -21,6 +22,7 @@ export default function Home() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const message = searchParams.get("message")
+  const supabase = createClientComponentClient()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -28,7 +30,24 @@ export default function Home() {
 
     try {
       await signIn(email, password)
-      // Add a direct navigation as a fallback
+      // Ambil user dari supabase setelah signIn
+      const { data: { user: signedInUser } } = await supabase.auth.getUser()
+      if (signedInUser) {
+        const { data, error } = await supabase
+          .from("users")
+          .select("id")
+          .eq("id", signedInUser.id)
+          .single()
+        if (error && error.code === 'PGRST116') {
+          // Row not found, insert user
+          await supabase.from("users").insert([
+            { id: signedInUser.id, email: signedInUser.email, full_name: signedInUser.user_metadata?.full_name || "" }
+          ])
+        } else if (error && error.code !== 'PGRST116') {
+          // Error lain, log
+          console.error('Supabase select user error:', error)
+        }
+      }
       setTimeout(() => {
         router.push("/dashboard")
       }, 1000)

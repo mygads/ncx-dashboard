@@ -125,6 +125,7 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
   const [collapsed, setCollapsed] = useState(collapsedProp ?? false)
   const [fullName, setFullName] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const router = useRouter()
 
   // Sync local state with prop
   useEffect(() => {
@@ -143,11 +144,7 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
     async function fetchUserInfo() {
       if (user) {
         const supabase = createClientComponentClient()
-        const { data, error } = await supabase
-          .from("users")
-          .select("full_name, email")
-          .eq("id", user.id)
-          .single()
+        const { data, error } = await supabase.from("users").select("full_name, email").eq("id", user.id).single()
         if (!error && data) {
           setFullName(data.full_name)
           setUserEmail(data.email)
@@ -162,6 +159,11 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
     setCollapsed(newCollapsed)
     localStorage.setItem("sidebar-collapsed", String(newCollapsed))
     if (onCollapseChange) onCollapseChange(newCollapsed)
+  }
+
+  const handleProfileClick = () => {
+    router.push("/dashboard/profile")
+    if (onItemClick) onItemClick()
   }
 
   return (
@@ -180,7 +182,10 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
       </button>
 
       {/* User Info */}
-      <div className="flex items-center px-4 py-4 border-b">
+      <div
+        className="flex items-center px-4 py-4 border-b cursor-pointer hover:bg-gray-50 transition-colors"
+        onClick={handleProfileClick}
+      >
         <span className="flex items-center justify-center w-10 bg-red-100 rounded-full">
           <User className="w-6 h-6 text-red-600" />
         </span>
@@ -232,7 +237,8 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
               className={cn(
                 "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition",
                 pathname === route.href || (route.href === "/dashboard/analytics" && pathname === "/dashboard")
-                  ? "bg-gray-100 text-black" : "text-gray-600 hover:bg-gray-100",
+                  ? "bg-gray-100 text-black"
+                  : "text-gray-600 hover:bg-gray-100",
               )}
               onClick={onItemClick}
             >
