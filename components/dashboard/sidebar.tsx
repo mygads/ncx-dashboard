@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -28,7 +29,7 @@ const topRoutes = [
   {
     label: "Home",
     icon: Home,
-    href: "/dashboard",
+    href: "/dashboard/home",
   },
   {
     label: "Revenue",
@@ -183,14 +184,22 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
 
       {/* User Info */}
       <div
-        className="flex items-center px-4 py-4 border-b cursor-pointer hover:bg-gray-50 transition-colors"
+        className="flex items-center px-2 py-2 border-b cursor-pointer hover:bg-gray-100 bg-gray-100 transition-colors"
         onClick={handleProfileClick}
       >
-        <span className="flex items-center justify-center w-10 bg-red-100 rounded-full">
-          <User className="w-6 h-6 text-red-600" />
+        <span className="flex items-center justify-center w-8 h-8 bg-white rounded-full">
+          {/* <Image 
+            src="/icon-telkom.png"
+            alt="User Avatar"
+            width={40}
+            height={40}
+            className="rounded-full"
+            style={{ objectFit: "cover" }}
+          /> */}
+          <User className="rounded-full object-cover text-gray-500" />
         </span>
         {!collapsed && (
-          <div className="ml-3">
+          <div className="ml-2">
             <div className="font-semibold text-sm">{fullName || user?.user_metadata?.full_name || user?.email}</div>
             <div className="text-xs text-gray-500">{userEmail || user?.email}</div>
           </div>
