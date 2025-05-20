@@ -174,38 +174,37 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
         collapsed ? "w-16" : "w-64",
       )}
     >
-      {/* Collapse button */}
+      {/* Logo Telkom di kiri atas */}
+      <div
+        className={cn(
+          "flex items-center justify-center py-4 border-b bg-white",
+          collapsed ? "px-0" : "px-0"
+        )}
+      >
+        <Image
+          src={collapsed ? "/icon-telkom.png" : "/telkom-logo.png"}
+          alt="Telkom Logo"
+          width={collapsed ? 40 : 180}
+          height={40}
+          className={cn(
+        "object-contain transition-all duration-300",
+        collapsed ? "w-10 h-10" : "w-44 h-10",
+        "max-w-full"
+          )}
+          priority
+          sizes={collapsed ? "40px" : "(max-width: 640px) 120px, 180px"}
+        />
+      </div>
+
+      {/* Collapse button (hide on mobile) */}
       <button
         onClick={toggleCollapse}
-        className="absolute -right-0 top-20 bg-white border border-gray-200 rounded-full p-1 shadow-md z-99999"
+        className="absolute -right-0 top-20 bg-white border border-gray-200 rounded-full p-1 shadow-md z-99999 hidden sm:block"
       >
         {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
       </button>
 
-      {/* User Info */}
-      <div
-        className="flex items-center px-2 py-2 border-b cursor-pointer hover:bg-gray-100 bg-gray-100 transition-colors"
-        onClick={handleProfileClick}
-      >
-        <span className="flex items-center justify-center w-8 h-8 bg-white rounded-full">
-          {/* <Image 
-            src="/icon-telkom.png"
-            alt="User Avatar"
-            width={40}
-            height={40}
-            className="rounded-full"
-            style={{ objectFit: "cover" }}
-          /> */}
-          <User className="rounded-full object-cover text-gray-500" />
-        </span>
-        {!collapsed && (
-          <div className="ml-2">
-            <div className="font-semibold text-sm">{fullName || user?.user_metadata?.full_name || user?.email}</div>
-            <div className="text-xs text-gray-500">{userEmail || user?.email}</div>
-          </div>
-        )}
-      </div>
-
+      {/* Bagian utama sidebar (routes, dll) */}
       <div className="flex-1 overflow-y-auto">
         {/* Top Routes */}
         <div className="py-2">
@@ -318,8 +317,32 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
         </div>
       </div>
 
+      {/* User Info di bawah, di atas logout */}
+      <div
+        className="flex items-center px-2 py-2 border-t border-b cursor-pointer hover:bg-gray-100 bg-white transition-colors"
+        onClick={handleProfileClick}
+      >
+        <span className="flex items-center justify-center w-8 h-8 bg-red-100 rounded-full">
+          {/* <Image 
+            src="/icon-telkom.png"
+            alt="User Avatar"
+            width={40}
+            height={40}
+            className="rounded-full"
+            style={{ objectFit: "cover" }}
+          /> */}
+          <User className="rounded-full object-cover text-gray-500" />
+        </span>
+        {!collapsed && (
+          <div className="ml-2">
+            <div className="font-semibold text-sm">{fullName || user?.user_metadata?.full_name || user?.email}</div>
+            <div className="text-xs text-gray-500">{userEmail || user?.email}</div>
+          </div>
+        )}
+      </div>
+
       {/* Logout Button */}
-      <div className="p-4 border-t">
+      <div className="p-2 border-t">
         <Button
           variant="ghost"
           className={cn(
