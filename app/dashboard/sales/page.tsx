@@ -1,3 +1,5 @@
+"use client"
+
 export default function SalesOperationPage() {
   return (
     <div className="p-6">

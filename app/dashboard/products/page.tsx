@@ -1,3 +1,5 @@
+"use client"
+
 export default function DigitalProductPage() {
   return (
     <div className="p-6">

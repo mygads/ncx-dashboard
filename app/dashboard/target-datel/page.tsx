@@ -1,3 +1,5 @@
+"use client"
+
 export default function TargetDatelPage() {
   return (
     <div className="p-6">
