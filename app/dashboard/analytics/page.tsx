@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Chart, registerables } from "chart.js"
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
+import { LastUpdatedDate, LastUpdatedFooter } from "@/components/dashboard/last-updated"
 Chart.register(...registerables)
 
 // Define Google Maps global types
@@ -23,8 +24,8 @@ type ProgressType = {
 
 // Fungsi untuk fetch data dari Google Sheets
 async function fetchProgressData(): Promise<ProgressType> {
-  const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
-  const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
+  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
+  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
   const sheetName = 'MTDProgress NCX';
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
   const res = await fetch(url);
@@ -53,8 +54,8 @@ async function fetchProgressData(): Promise<ProgressType> {
 
 // Fungsi untuk fetch data dari sheet UNIT NCX
 async function fetchUnitSummary() {
-  const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
-  const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
+  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
+  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
   const sheetName = 'UNIT NCX';
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
   const res = await fetch(url);
@@ -126,7 +127,6 @@ export default function AnalyticsDashboard() {
   const [loading, setLoading] = useState(false)
   const pieChartRef = useRef<HTMLCanvasElement>(null)
   const barChartRef = useRef<HTMLCanvasElement>(null)
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 
   // State untuk data progress dari Google Sheets
   const [progress, setProgress] = useState<ProgressType>({
@@ -185,15 +185,6 @@ export default function AnalyticsDashboard() {
       { location: "SOUTH SULAWESI", count: 28, lat: -5.1477, lng: 119.4327 },
       { location: "WEST SULAWESI", count: 18, lat: -2.8441, lng: 119.2321 },
     ],
-  }
-
-  const handleRefresh = async () => {
-    setLoading(true)
-    // Simulate data refresh
-    setTimeout(() => {
-      setLastUpdated(new Date())
-      setLoading(false)
-    }, 1000)
   }
 
   useEffect(() => {
@@ -435,7 +426,7 @@ export default function AnalyticsDashboard() {
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="font-medium">Update</span>
-            <span className="text-red-600 border-b-2 border-red-600">19 Mei 2025</span>
+            <LastUpdatedDate className="text-red-600 border-b-2 border-red-600" dateFormat="date" />
           </div>
           <div className="text-right">
             <span className="text-red-600 font-medium">Month to Date</span>
@@ -546,7 +537,7 @@ export default function AnalyticsDashboard() {
         </div>
 
         {/* Footer */}
-        <div className="text-xs text-gray-500">Data Last Updated: {lastUpdated.toLocaleString()} | Privacy Policy</div>
+        <LastUpdatedFooter />
       </div>
     </div>
   )

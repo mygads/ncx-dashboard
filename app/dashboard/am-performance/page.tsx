@@ -8,12 +8,13 @@ import type { AMData, InsightData } from "@/lib/types"
 import { Chart, registerables } from "chart.js"
 import { ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
+import { LastUpdatedDate, LastUpdatedFooter } from "@/components/dashboard/last-updated"
 Chart.register(...registerables)
 
 // Fungsi untuk fetch data AM dari Google Sheets
 async function fetchAMData() {
-  const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
-  const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
+  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
+  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
   const sheetName = 'AM NCX';
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
   const res = await fetch(url);
@@ -34,8 +35,8 @@ async function fetchAMData() {
 
 // Fungsi untuk fetch insight AM dari Google Sheets
 async function fetchInsightAM() {
-  const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
-  const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
+  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
+  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
   const sheetName = 'Update Text (Looker Studio)';
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
   const res = await fetch(url);
@@ -55,7 +56,6 @@ export default function AMPerformancePage() {
   const [selectedAMs, setSelectedAMs] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
 
   const barChartRef = useRef<HTMLCanvasElement>(null)
   const pieChartRef = useRef<HTMLCanvasElement>(null)
@@ -441,7 +441,7 @@ export default function AMPerformancePage() {
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="font-medium">Update</span>
-            <span className="text-red-600 border-b-2 border-red-600">19 Mei 2025</span>
+            <LastUpdatedDate className="text-red-600 border-b-2 border-red-600" dateFormat="date" />
           </div>
           <div className="text-right">
             <span className="text-red-600 font-medium">Month to Date</span>
@@ -590,7 +590,7 @@ export default function AMPerformancePage() {
         </Card>
 
         {/* Footer */}
-        <div className="text-xs text-gray-500">Data Last Updated: {lastUpdated.toLocaleString()} | Privacy Policy</div>
+        <LastUpdatedFooter />
       </div>
     </div>
   )

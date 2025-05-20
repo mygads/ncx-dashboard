@@ -8,12 +8,13 @@ import type { AMData, InsightData } from "@/lib/types"
 import { Chart, registerables } from "chart.js"
 import { ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
+import { LastUpdatedDate, LastUpdatedFooter } from "@/components/dashboard/last-updated"
 Chart.register(...registerables)
 
 // Fungsi untuk fetch data Branch Detail dari Google Sheets
 async function fetchBranchDetailData() {
-  const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
-  const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
+  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
+  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
   const sheetName = 'BRANCH NCX';
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
   const res = await fetch(url);
@@ -34,8 +35,8 @@ async function fetchBranchDetailData() {
 
 // Fungsi untuk fetch insight Branch Detail dari Google Sheets
 async function fetchInsightBranchDetail() {
-  const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
-  const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
+  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
+  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
   const sheetName = 'Update Text (Looker Studio)';
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
   const res = await fetch(url);
@@ -55,26 +56,6 @@ export default function BranchDetailPage() {
   const [selectedBranchs, setSelectedBranchs] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-
-  // Fetch last updated time from Google Drive API metadata
-  useEffect(() => {
-    async function fetchLastUpdated() {
-      try {
-        const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
-        const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
-        const url = `https://www.googleapis.com/drive/v3/files/${spreadsheetId}?fields=modifiedTime&key=${apiKey}`;
-        const res = await fetch(url);
-        const json = await res.json();
-        if (json?.modifiedTime) {
-          setLastUpdated(new Date(json.modifiedTime));
-        }
-      } catch (e) {
-        console.error("Error fetching last updated time:", e);
-      }
-    }
-    fetchLastUpdated();
-  }, []);
 
   const barChartRef = useRef<HTMLCanvasElement>(null)
   const pieChartRef = useRef<HTMLCanvasElement>(null)
@@ -321,9 +302,7 @@ export default function BranchDetailPage() {
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="font-medium">Update</span>
-            <span className="text-red-600 border-b-2 border-red-600">
-              {lastUpdated ? lastUpdated.toLocaleDateString() : "Loading..."}
-            </span>
+            <LastUpdatedDate className="text-red-600 border-b-2 border-red-600" dateFormat="date" />
           </div>
           <div className="text-right">
             <span className="text-red-600 font-medium">Month to Date</span>
@@ -455,9 +434,7 @@ export default function BranchDetailPage() {
             <p className="text-base">{insightOrder}</p>
           </CardContent>
         </Card>
-        <div className="text-xs text-gray-500">
-          Data Last Updated: {lastUpdated ? lastUpdated.toLocaleString() : "Loading..."}
-        </div>
+        <LastUpdatedFooter />
       </div>
     </div>
   )
