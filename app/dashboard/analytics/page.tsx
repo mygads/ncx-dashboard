@@ -7,6 +7,11 @@ import { Chart, registerables } from "chart.js"
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
 import { LastUpdatedDate, LastUpdatedFooter } from "@/components/dashboard/last-updated"
+import { ModernStatCard } from "@/components/dashboard/modern-stat-card"
+import { ModernPieChart } from "@/components/dashboard/modern-pie-chart"
+import { ModernBarChart } from "@/components/dashboard/modern-bar-chart"
+import { ModernHotdaBarChart } from "@/components/dashboard/modern-hotda-bar-chart"
+import { chartConfig } from "@/lib/chart-config"
 Chart.register(...registerables, ChartDataLabels)
 
 // Define Google Maps global types
@@ -190,229 +195,22 @@ export default function AnalyticsDashboard() {
       { status: "COMPLETE", percentage: totalOrders ? (Number(progress.COMPLETE) / totalOrders) * 100 : 0, color: "#32CD32" },
       { status: "PENDING BILLING APROVAL", percentage: totalOrders ? (Number(progress["PENDING BILLING APROVAL"]) / totalOrders) * 100 : 0, color: "#DC3545" },
     ],
-    monthlyData: ytdProgress.monthlyData.length ? ytdProgress.monthlyData : [
-      { month: "Jan 2025", totalOrders: 0, achPercentage: 0 },
-      { month: "Feb 2025", totalOrders: 0, achPercentage: 0 },
-      { month: "Mar 2025", totalOrders: 0, achPercentage: 0 },
-      { month: "Apr 2025", totalOrders: 0, achPercentage: 0 },
-      { month: "May 2025", totalOrders: 0, achPercentage: 0 },
-      { month: "Jun 2025", totalOrders: 0, achPercentage: 0 },
-      { month: "Jul 2025", totalOrders: 0, achPercentage: 0 },
-      { month: "Aug 2025", totalOrders: 0, achPercentage: 0 },
-      { month: "Sep 2025", totalOrders: 0, achPercentage: 0 },
-      { month: "Oct 2025", totalOrders: 0, achPercentage: 0 },
-      { month: "Nov 2025", totalOrders: 0, achPercentage: 0 },
-      { month: "Dec 2025", totalOrders: 0, achPercentage: 0 },
-    ],
-    hotdaData: [
-      { location: "INNER - PALU", count: 113, lat: -0.9002, lng: 119.8779 },
-      { location: "NORTH SULAWESI", count: 42, lat: 1.4748, lng: 124.842 },
-      { location: "CENTRAL SULAWESI", count: 35, lat: -1.43, lng: 121.4456 },
-      { location: "SOUTH SULAWESI", count: 28, lat: -5.1477, lng: 119.4327 },
-      { location: "WEST SULAWESI", count: 18, lat: -2.8441, lng: 119.2321 },
-    ],
+    monthlyData: ytdProgress.monthlyData.length ? ytdProgress.monthlyData : [],
+    hotdaData: [hotdaData.length ? hotdaData : []],
   }
 
-  useEffect(() => {
-    if (pieChartRef.current) {
-      const ctx = pieChartRef.current.getContext("2d");
-      if (ctx) {
-        const pieChart = new Chart(ctx, {
-          type: "pie",
-          data: {
-            labels: data.progressData.map((item) => item.status),
-            datasets: [
-              {
-                data: data.progressData.map((item) => Math.round(item.percentage)),
-                backgroundColor: data.progressData.map((item) => item.color),
-                borderWidth: 0,
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                position: "right",
-                labels: {
-                  usePointStyle: true,
-                  pointStyle: "circle",
-                  padding: 20,
-                  font: {
-                    size: 12,
-                  },
-                },
-              },
-              tooltip: {
-                callbacks: {
-                  label: (context: any) => `${context.label}: ${Math.round(Number(context.raw))}%`,
-                },
-              },
-            },
-            animation: {
-              onComplete: function () {
-                const chart = this as Chart;
-                const ctx = chart.ctx;
-                ctx.save();
-                chart.getDatasetMeta(0).data.forEach((arc: any, i: number) => {
-                  const dataset = chart.data.datasets[0];
-                  const value = dataset.data[i];
-                  if (typeof value === 'number' && value > 0) {
-                    // Chart.js v3+ arc geometry
-                    const props = arc.getProps(['startAngle', 'endAngle', 'outerRadius', 'innerRadius', 'x', 'y'], true);
-                    const midAngle = (props.startAngle + props.endAngle) / 2;
-                    const radius = (props.outerRadius + props.innerRadius) / 2;
-                    const x = props.x + Math.cos(midAngle) * radius * 0.7;
-                    const y = props.y + Math.sin(midAngle) * radius * 0.7;
-                    ctx.fillStyle = '#222';
-                    ctx.font = 'bold 16px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText(`${value}%`, x, y);
-                  }
-                });
-                ctx.restore();
-              }
-            }
-          },
-        });
-        return () => {
-          pieChart.destroy();
-        };
-      }
-    }
-  }, [data.progressData]);
-
-  useEffect(() => {
-    // Create bar chart for Orders Complete YTD with MoM Orders growth line
-    if (barChartRef.current) {
-      const ctx = barChartRef.current.getContext("2d");
-      if (ctx) {
-        // Calculate MoM Orders growth percentage
-        const orders = data.monthlyData.map((item: any) => item.totalOrders);
-        const momOrdersGrowth = orders.map((val: number, idx: number, arr: number[]) => {
-          if (idx === 0) return 0;
-          const prev = arr[idx - 1];
-          if (prev === 0) return 0;
-          return Number((((val - prev) / prev) * 100).toFixed(2));
-        });
-        const barChart = new Chart(ctx, {
-          type: "bar",
-          data: {
-            labels: data.monthlyData.map((item: any) => item.month.split(" ")[0] + " " + item.month.split(" ")[1]),
-            datasets: [
-              {
-                type: "bar",
-                label: "Total Orders Complete",
-                data: orders,
-                backgroundColor: "#6366f1", // fixed indigo color
-                order: 1,
-                yAxisID: "y",
-              },
-              {
-                type: "line",
-                label: "% MoM Orders Growth",
-                data: momOrdersGrowth,
-                borderColor: "#f43f5e",
-                backgroundColor: "#f43f5e",
-                borderWidth: 3,
-                pointBackgroundColor: "#f59e42",
-                pointBorderColor: "#fff",
-                pointRadius: 5,
-                pointHoverRadius: 7,
-                fill: false,
-                order: 0,
-                yAxisID: "y1",
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                position: "top",
-              },
-              tooltip: {
-                enabled: true,
-                callbacks: {
-                  label: function(context: any) {
-                    if (context.dataset.label === "% MoM Orders Growth") {
-                      return `${context.label}: ${context.raw}%`;
-                    }
-                    return `${context.label}: ${context.raw}`;
-                  },
-                },
-              },
-              datalabels: {
-                display: true,
-                color: function(context: any) {
-                  return context.dataset.type === 'bar' ? '#222' : '#f43f5e';
-                },
-                font: {
-                  weight: 'bold',
-                  size: 13,
-                },
-                anchor: function(context: any) {
-                  return context.dataset.type === 'bar' ? 'end' : 'start';
-                },
-                align: function(context: any) {
-                  return context.dataset.type === 'bar' ? 'end' : 'start';
-                },
-                formatter: function(value: number, context: any) {
-                  if (context.dataset.type === 'bar') {
-                    return value;
-                  }
-                  return value + '%';
-                },
-              },
-            },
-            scales: {
-              y: {
-                type: "linear",
-                position: "left",
-                title: {
-                  display: true,
-                  text: "Total Orders Complete",
-                },
-                min: 0,
-                ticks: {
-                  stepSize: 50,
-                },
-              },
-              y1: {
-                type: "linear",
-                position: "right",
-                title: {
-                  display: true,
-                  text: "% MoM Orders Growth",
-                },
-                ticks: {
-                  callback: function(value: string | number) { return value + "%"; },
-                  stepSize: 20,
-                },
-                grid: {
-                  drawOnChartArea: false,
-                },
-              },
-              x: {
-                title: {
-                  display: true,
-                  text: "Bulan",
-                  align: "center",
-                },
-              },
-            },
-          },
-          plugins: [ChartDataLabels],
-        });
-        return () => {
-          barChart.destroy();
-        };
-      }
-    }
-  }, [data.monthlyData]);
+  // Add colors to progress data
+  const progressDataWithColors = data.progressData.map((item) => ({
+    ...item,
+    color:
+      item.status === "PENDING BASO"
+        ? chartConfig.colors.pending
+        : item.status === "IN PROGRESS"
+        ? chartConfig.colors.inProgress
+        : item.status === "COMPLETE"
+        ? chartConfig.colors.complete
+        : chartConfig.colors.pendingBilling,
+  }))
 
   useEffect(() => {
     if (hotdaBarChartRef.current && hotdaData.length > 0) {
@@ -476,82 +274,47 @@ export default function AnalyticsDashboard() {
         </div>
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-4 relative">
-          <Card className="relative overflow-hidden bg-gradient-to-br from-purple-800 via-purple-700 to-purple-900 text-white shadow-lg">
-            <CardContent className="p-4 flex flex-col h-24 justify-between">
-              <div className="text-sm font-medium">Total Orders</div>
-              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.totalOrders}</div>
-              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-purple-400/20 to-transparent rounded-b-lg" />
-            </CardContent>
-          </Card>
-          <Card className="relative overflow-hidden bg-gradient-to-br from-orange-500 via-orange-400 to-yellow-500 text-white shadow-lg">
-            <CardContent className="p-4 flex flex-col h-24 justify-between">
-              <div className="text-sm font-medium">In Progress</div>
-              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.inProgress}</div>
-              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-orange-300/20 to-transparent rounded-b-lg" />
-            </CardContent>
-          </Card>
-          <Card className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400 text-white shadow-lg">
-            <CardContent className="p-4 flex flex-col h-24 justify-between">
-              <div className="text-sm font-medium">Pending BASO</div>
-              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.pendingBaso}</div>
-              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-blue-300/20 to-transparent rounded-b-lg" />
-            </CardContent>
-          </Card>
-          <Card className="relative overflow-hidden bg-gradient-to-br from-red-600 via-red-500 to-pink-500 text-white shadow-lg">
-            <CardContent className="p-4 flex flex-col h-24 justify-between">
-              <div className="text-sm font-medium">Pending Billing Approval</div>
-              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.pendingBillingApproval}</div>
-              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-red-300/20 to-transparent rounded-b-lg" />
-            </CardContent>
-          </Card>
-          <Card className="relative overflow-hidden bg-gradient-to-br from-green-600 via-green-500 to-lime-400 text-white shadow-lg">
-            <CardContent className="p-4 flex flex-col h-24 justify-between">
-              <div className="text-sm font-medium">Total Complete</div>
-              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.totalComplete}</div>
-              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-green-300/20 to-transparent rounded-b-lg" />
-            </CardContent>
-          </Card>
-          <Card className="relative overflow-hidden bg-gradient-to-br from-red-700 via-red-600 to-red-400 text-white shadow-lg">
-            <CardContent className="p-4 flex flex-col h-24 justify-between">
-              <div className="text-sm font-medium">Total Failed</div>
-              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.totalFailed}</div>
-              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-red-300/20 to-transparent rounded-b-lg" />
-            </CardContent>
-          </Card>
-          <Card className="relative overflow-hidden bg-gradient-to-br from-purple-900 via-fuchsia-700 to-pink-600 text-white shadow-lg">
-            <CardContent className="p-4 flex flex-col h-24 justify-between">
-              <div className="text-sm font-medium">Overall % ACH</div>
-              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.overallAchPercentage}%</div>
-              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-pink-300/20 to-transparent rounded-b-lg" />
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4">
+          <ModernStatCard
+            title="Total Orders"
+            value={data.totalOrders}
+            className="bg-gradient-to-br from-purple-800 via-purple-700 to-purple-900 text-white xl:col-span-1"
+          />
+          <ModernStatCard
+            title="In Progress"
+            value={data.inProgress}
+            className="bg-gradient-to-br from-orange-500 via-orange-400 to-yellow-500 text-white xl:col-span-1"
+          />
+          <ModernStatCard
+            title="Pending BASO"
+            value={data.pendingBaso}
+            className="bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400 text-white xl:col-span-1"
+          />
+          <ModernStatCard
+            title="Pending Billing Approval"
+            value={data.pendingBillingApproval}
+            className="bg-gradient-to-br from-red-600 via-red-500 to-pink-500 text-white xl:col-span-1"
+          />
+          <ModernStatCard
+            title="Total Complete"
+            value={data.totalComplete}
+            className="bg-gradient-to-br from-green-600 via-green-500 to-lime-400 text-white xl:col-span-1"
+          />
+          <ModernStatCard
+            title="Total Failed"
+            value={data.totalFailed}
+            className="bg-gradient-to-br from-red-700 via-red-600 to-red-400 text-white xl:col-span-1"
+          />
+          <ModernStatCard
+            title="Overall % ACH"
+            value={`${data.overallAchPercentage}%`}
+            className="bg-gradient-to-br from-purple-900 via-fuchsia-700 to-pink-600 text-white xl:col-span-1"
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Pie Chart */}
-            <Card className="col-span-1 relative overflow-hidden bg-white shadow-lg border-0">
-              {/* Decorative gradient blob */}
-
-              <CardContent className="p-4 relative z-10">
-                <h2 className="text-lg font-semibold mb-4 text-black flex items-center gap-2">
-                Persentase Progress MTD
-                </h2>
-                <div className="h-[260px] w-full flex items-center justify-center relative">
-                <canvas ref={pieChartRef} className="z-10" />
-                </div>
-              </CardContent>
-            </Card>
-
-          {/* Bar Chart */}
-          <Card className="col-span-2">
-            <CardContent className="p-4">
-              <h2 className="text-lg font-medium mb-4">Orders Complete YTD</h2>
-              <div className="h-[300px] w-full">
-                <canvas ref={barChartRef} />
-              </div>
-            </CardContent>
-          </Card>
+          <ModernPieChart data={progressDataWithColors} title="Persentase Progress MTD" />
+          <ModernBarChart data={data.monthlyData} title="Orders Complete YTD" className="lg:col-span-2" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -566,22 +329,34 @@ export default function AnalyticsDashboard() {
             </Card>
             <Card className="relative overflow-hidden bg-gradient-to-br from-purple-900 via-fuchsia-700 to-pink-600 text-white shadow-lg">
               <CardContent className="p-4 flex flex-col h-24 justify-between">
-                <div className="text-sm font-medium">Ach Last Month</div>
-                <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.achLastMonth}%</div>
-                <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-pink-300/20 to-transparent rounded-b-lg" />
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Ach Last Month</span>
+                {/* Trend label */}
+                {Number(data.achLastMonth) > Number(data.overallAchPercentage) ? (
+                <span className="flex items-center text-green-200 text-xs font-semibold bg-green-700/40 px-2 py-0.5 rounded">
+                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                  Naik
+                </span>
+                ) : Number(data.achLastMonth) < Number(data.overallAchPercentage) ? (
+                <span className="flex items-center text-rose-200 text-xs font-semibold bg-rose-700/40 px-2 py-0.5 rounded">
+                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                  Turun
+                </span>
+                ) : (
+                <span className="flex items-center text-gray-200 text-xs font-semibold bg-gray-700/40 px-2 py-0.5 rounded">
+                  <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" /></svg>
+                  Stabil
+                </span>
+                )}
+              </div>
+              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.achLastMonth}%</div>
+              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-pink-300/20 to-transparent rounded-b-lg" />
               </CardContent>
             </Card>
           </div>
 
           {/* HOTDA Bar Chart */}
-          <Card className="col-span-2">
-            <CardContent className="p-4">
-              <h2 className="text-lg font-medium mb-4">Jumlah Orders berdasarkan HOTDA</h2>
-              <div className="h-[300px] w-full">
-                <canvas ref={hotdaBarChartRef} />
-              </div>
-            </CardContent>
-          </Card>
+          <ModernHotdaBarChart data={hotdaData} title="Jumlah Orders berdasarkan HOTDA" className="col-span-2" />
         </div>
 
         {/* Footer */}
