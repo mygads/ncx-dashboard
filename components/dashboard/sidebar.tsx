@@ -86,13 +86,6 @@ const middleRoutes = [
   },
 ]
 
-const targetAMItems = [
-  { label: "MOHAMAD INDRA PRAMONO RAUF", href: "/dashboard/target-am/mohamad-indra" },
-  { label: "AGUNG NUGROHO", href: "/dashboard/target-am/agung-nugroho" },
-  { label: "RIVO NOVEM ABRAHAM", href: "/dashboard/target-am/rivo-novem" },
-  { label: "MOH MARWAN FAJAR", href: "/dashboard/target-am/moh-marwan" },
-]
-
 const targetDATELItems = [{ label: "AGUSTINUS KOMBER", href: "/dashboard/target-datel/agustinus-komber" }]
 
 const iconColorMap: Record<string, string> = {
@@ -126,6 +119,7 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
   const [collapsed, setCollapsed] = useState(collapsedProp ?? false)
   const [fullName, setFullName] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [targetAMItems, setTargetAMItems] = useState<{ label: string; href: string }[]>([]);
   const router = useRouter()
 
   // Sync local state with prop
@@ -154,6 +148,44 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
     }
     fetchUserInfo()
   }, [user])
+
+  // Fetch Target AM data from spreadsheet
+  useEffect(() => {
+    async function fetchTargetAMData() {
+      try {
+        const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
+        const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
+        const sheetName = 'DataAutoGSlide';
+        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
+        const res = await fetch(url);
+        const json = await res.json();
+        if (!json.values || json.values.length < 2) return;
+        const headers = json.values[0];
+        const bagianSlideIndex = headers.findIndex((h: string) => h === "Bagian Slide");
+        if (bagianSlideIndex === -1) return;
+        const targetAMRows = json.values.slice(1).filter((row: any[]) => {
+          const bagianSlide = row[bagianSlideIndex] || "";
+          return bagianSlide.includes("TARGET AM WBS SULBAGTENG");
+        });
+        const uniqueAMs = new Map<string, { label: string; href: string }>();
+        targetAMRows.forEach((row: any[]) => {
+          const bagianSlide = row[bagianSlideIndex] || "";
+          const match = bagianSlide.match(/TARGET AM WBS SULBAGTENG\s*(.*?)\s*\/\s*(\d+)/i);
+          if (match && match.length >= 3) {
+            const name = match[1].trim();
+            const slug = name.toLowerCase().replace(/\s+/g, '-');
+            if (!uniqueAMs.has(name)) {
+              uniqueAMs.set(name, { label: name, href: `/dashboard/target-am/${slug}` });
+            }
+          }
+        });
+        setTargetAMItems(Array.from(uniqueAMs.values()));
+      } catch (error) {
+        // Optional: handle error
+      }
+    }
+    fetchTargetAMData();
+  }, []);
 
   const toggleCollapse = () => {
     const newCollapsed = !collapsed
@@ -267,19 +299,31 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
             <Target className={cn("h-5 w-5 min-w-5", iconColorMap["Target AM"])} />
             {!collapsed && <span className="ml-3">Target AM</span>}
           </button>
-
           {!collapsed && targetAMExpanded && (
-            <div className="pl-12">
-              {targetAMItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="block py-2 text-sm text-gray-600 hover:text-gray-900"
-                  onClick={onItemClick}
-                >
-                  {item.label}
-                </Link>
-              ))}
+            <div className="pl-12 mt-1 flex flex-col gap-1 border-l-2 border-amber-200">
+              {targetAMItems.length === 0 ? (
+                <div className="text-sm text-gray-500 py-2">Loading...</div>
+              ) : (
+                targetAMItems.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center gap-2 py-1.5 px-3 rounded-md transition text-sm",
+                        isActive
+                          ? "bg-gray-100  shadow-sm"
+                          : "text-gray-700 hover:bg-red-50 hover:text-red-900"
+                      )}
+                      onClick={onItemClick}
+                    >
+                      {isActive && <span className="w-2 h-2 bg-red-500 rounded-full inline-block" />}
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })
+              )}
             </div>
           )}
         </div>
