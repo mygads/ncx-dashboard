@@ -264,8 +264,8 @@ export default function AnalyticsDashboard() {
       <DynamicHeader />
 
       {/* Dashboard Content */}
-      <div className="p-6 space-y-6 bg-gray-50 flex-1">
-        <div className="flex justify-between items-center mb-2 px-2 py-2 rounded-lg bg-white/70 shadow-sm border border-gray-100">
+      <div className="p-6 space-y-6 flex-1">
+        <div className="flex justify-between items-center mb-2 px-2 py-2 rounded-lg bg-white shadow-sm border border-gray-100">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-gray-700 tracking-tight text-sm">Last Update</span>
             <LastUpdatedDate className="text-rose-600 font-semibold px-2 py-0.5 rounded bg-rose-50 border border-rose-100 text-xs" dateFormat="date" />

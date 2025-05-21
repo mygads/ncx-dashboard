@@ -119,7 +119,7 @@ export function CloneBarChart({ data, title, className }: CloneBarChartProps) {
 
     return (
         <Card className={`overflow-hidden shadow-lg border-0 ${className}`}>
-            <CardHeader className="pb-2 bg-gradient-to-r from-gray-50 to-gray-100 border-b">
+            <CardHeader className="pb-2 bg-gradient-to-r from-red-200 to-red-300 border-b">
                 <CardTitle className="text-lg font-medium text-gray-800">{title}</CardTitle>
             </CardHeader>
             <CardContent className="p-4 relative">

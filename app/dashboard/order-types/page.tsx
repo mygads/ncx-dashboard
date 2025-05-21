@@ -157,8 +157,8 @@ export default function OrderTypesPage() {
   return (
     <div className="flex flex-col h-full">
       <DynamicHeader />
-      <div className="p-6 space-y-6 bg-gray-50 flex-1">
-        <div className="flex justify-between items-center mb-2 px-2 py-2 rounded-lg bg-white/70 shadow-sm border border-gray-100">
+      <div className="p-6 space-y-6 flex-1">
+        <div className="flex justify-between items-center mb-2 px-2 py-2 rounded-lg bg-white shadow-sm border border-gray-100">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-gray-700 tracking-tight text-sm">Last Update</span>
             <LastUpdatedDate className="text-rose-600 font-semibold px-2 py-0.5 rounded bg-rose-50 border border-rose-100 text-xs" dateFormat="date" />
@@ -166,10 +166,26 @@ export default function OrderTypesPage() {
           <span className="text-xs font-medium text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-100 shadow-sm">Month to Date</span>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          <CloneStatCard title="Total Orders" value={totalOrders} className="bg-blue-600 text-white" />
-          <CloneStatCard title="Total Complete" value={totalComplete} className="bg-green-600 text-white" />
-          <CloneStatCard title="Total Failed" value={totalFailed} className="bg-red-600 text-white" />
-          <CloneStatCard title="Overall % ACH" value={`${overallAchPercentage}%`} className="bg-orange-500 text-white" />
+          <CloneStatCard
+            title="Total Orders"
+            value={totalOrders}
+            className="bg-gradient-to-br from-blue-700 via-blue-500 to-blue-300 text-white shadow-lg rounded-xl border border-blue-100"
+          />
+          <CloneStatCard
+            title="Total Complete"
+            value={totalComplete}
+            className="bg-gradient-to-br from-green-700 via-green-500 to-green-300 text-white shadow-lg rounded-xl border border-green-100"
+          />
+          <CloneStatCard
+            title="Total Failed"
+            value={totalFailed}
+            className="bg-gradient-to-br from-rose-700 via-rose-500 to-rose-300 text-white shadow-lg rounded-xl border border-rose-100"
+          />
+          <CloneStatCard
+            title="Overall % ACH"
+            value={`${overallAchPercentage}%`}
+            className="bg-gradient-to-br from-yellow-500 via-orange-400 to-yellow-200 text-white shadow-lg rounded-xl border border-yellow-100"
+          />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3">

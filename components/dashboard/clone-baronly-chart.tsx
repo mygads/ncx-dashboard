@@ -100,8 +100,8 @@ export function CloneBarOnlyChart({ data, title, className }: CloneBarOnlyChartP
 
     return (
         <Card className={`overflow-hidden shadow-lg border-0 ${className}`}>
-            <CardHeader className="pb-2 bg-gradient-to-r from-gray-50 to-gray-100 border-b">
-                <CardTitle className="text-lg font-medium text-gray-800">{title}</CardTitle>
+            <CardHeader className="pb-2 bg-gradient-to-r from-red-200 to-red-300 border-b">
+                <CardTitle className="text-lg font-medium text-black">{title}</CardTitle>
             </CardHeader>
             <CardContent className="p-4 relative">
                 <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-50 rounded-full -mr-20 -mt-20 opacity-20"></div>

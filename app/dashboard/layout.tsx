@@ -73,7 +73,7 @@ export default function DashboardLayout({
       </div>
 
       {/* Main content */}
-      <main className="flex-1 min-h-screen overflow-y-auto bg-gradient-to-br from-gray-50 via-white to-blue-50 relative">
+      <main className="flex-1 min-h-screen overflow-y-auto bg-gray-100 relative">
         {/* Decorative SVG top left */}
         <svg className="absolute left-0 top-0 w-40 h-40 opacity-20 pointer-events-none" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="100" cy="100" r="100" fill="url(#paint0_radial)" />

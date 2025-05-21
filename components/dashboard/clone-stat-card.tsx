@@ -18,9 +18,12 @@ export function CloneStatCard({ title, value, className, icon }: CloneStatCardPr
           <div className="text-sm font-medium">{title}</div>
           {icon && <div className="text-lg opacity-70">{icon}</div>}
         </div>
+
         <div className="flex items-end justify-between">
           <div className="text-3xl font-bold">{value}</div>
         </div>
+
+        {/* Decorative bottom gradient */}
         <div className="absolute bottom-0 left-0 w-full h-1.5 bg-gradient-to-r from-white/10 via-white/30 to-transparent rounded-b-lg" />
       </CardContent>
     </Card>
