@@ -10,6 +10,11 @@ import { ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
 import { LastUpdatedDate, LastUpdatedFooter } from "@/components/dashboard/last-updated"
 import Loading from "@/components/ui/loading"
+import { CloneStatCard } from "@/components/dashboard/clone-stat-card"
+import { ClonePieChart } from "@/components/dashboard/clone-pie-chart"
+import { CloneBarChart } from "@/components/dashboard/clone-bar-chart"
+import { CloneBarOnlyChart } from "@/components/dashboard/clone-baronly-chart"
+import { CloneInsightCard } from "@/components/dashboard/clone-insight-card"
 Chart.register(...registerables)
 
 // Fungsi untuk fetch data Branch Detail dari Google Sheets
@@ -88,12 +93,6 @@ export default function BranchDetailPage() {
   const filteredOrders = sortedOrders.filter((o) => o.name.toLowerCase().includes(searchTerm.toLowerCase()))
   // Get data for selected orders
   const selectedBranchsData = branchData.filter((o) => selectedBranchs.includes(o.name))
-  // Calculate totals for selected orders
-  const totalOrders = selectedBranchsData.reduce((sum, o) => sum + o.total, 0)
-  const totalComplete = selectedBranchsData.reduce((sum, o) => sum + o.complete, 0)
-  const totalFailed = selectedBranchsData.reduce((sum, o) => sum + o.failed, 0)
-  const overallAchPercentage = totalOrders > 0 ? ((totalComplete / totalOrders) * 100).toFixed(2) : "0.00"
-
   // Toggle branch selection
   const toggleBranch = (name: string) => {
     if (selectedBranchs.includes(name)) {
@@ -110,173 +109,6 @@ export default function BranchDetailPage() {
   const clearAllOrders = () => {
     setSelectedBranchs([])
   }
-
-  // Update charts when selected orders change
-  useEffect(() => {
-    updateBarChart()
-    updatePieChart()
-    updateAchChart()
-  }, [selectedBranchs])
-
-  // Bar chart for total orders
-  const updateBarChart = () => {
-    if (!barChartRef.current) return
-    const ctx = barChartRef.current.getContext("2d")
-    if (!ctx) return
-    const chartInstance = Chart.getChart(barChartRef.current)
-    if (chartInstance) chartInstance.destroy()
-    const sortedData = [...selectedBranchsData].sort((a, b) => b.total - a.total)
-    new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: sortedData.map((o) => o.name),
-        datasets: [
-          {
-            label: "Total Orders",
-            data: sortedData.map((o) => o.total),
-            backgroundColor: sortedData.map((_, i) => getColorByIndex(i)),
-            borderWidth: 0,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            title: { display: true, text: "Total" },
-          },
-          x: {
-            title: { display: true, text: "Branch" },
-          },
-        },
-        plugins: { legend: { display: false } },
-      },
-    })
-  }
-
-  // Pie chart for completion percentage
-  const updatePieChart = () => {
-    if (!pieChartRef.current) return
-    const ctx = pieChartRef.current.getContext("2d")
-    if (!ctx) return
-    const pieChartInstance = Chart.getChart(pieChartRef.current)
-    if (pieChartInstance) pieChartInstance.destroy()
-    const totalCompletionsAll = selectedBranchsData.reduce((sum, o) => sum + o.complete, 0)
-    const sortedForPie = [...selectedBranchsData].sort((a, b) => {
-      const pa = totalCompletionsAll > 0 ? (a.complete / totalCompletionsAll) * 100 : 0;
-      const pb = totalCompletionsAll > 0 ? (b.complete / totalCompletionsAll) * 100 : 0;
-      return pb - pa;
-    });
-    const labels = sortedForPie.map((o) => o.name)
-    const dataPie = sortedForPie.map((o) => totalCompletionsAll > 0 ? (o.complete / totalCompletionsAll) * 100 : 0)
-    new Chart(ctx, {
-      type: "pie",
-      data: {
-        labels,
-        datasets: [
-          {
-            data: dataPie,
-            backgroundColor: labels.map((_, i) => getColorByIndex(i)),
-            borderWidth: 0
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: "right",
-            labels: {
-              usePointStyle: true,
-              pointStyle: "circle",
-              padding: 20,
-              font: { size: 12 }
-            }
-          },
-          tooltip: {
-            callbacks: {
-              label: (context) => `${context.label}: ${Number(context.raw).toFixed(1)}%`
-            }
-          }
-        },
-        animation: {
-          onComplete: function () {
-            const chart = this as Chart;
-            const ctx = chart.ctx;
-            ctx.save();
-            chart.getDatasetMeta(0).data.forEach((arc: any, i: number) => {
-              const dataset = chart.data.datasets[0];
-              const value = dataset.data[i];
-              if (typeof value === 'number' && value > 10) {
-                const props = arc.getProps(['startAngle', 'endAngle', 'outerRadius', 'innerRadius', 'x', 'y'], true);
-                const midAngle = (props.startAngle + props.endAngle) / 2;
-                const radius = (props.outerRadius + props.innerRadius) / 2;
-                const x = props.x + Math.cos(midAngle) * radius * 0.7;
-                const y = props.y + Math.sin(midAngle) * radius * 0.7;
-                ctx.fillStyle = '#222';
-                ctx.font = 'bold 16px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(`${Math.round(value)}%`, x, y);
-              }
-            });
-            ctx.restore();
-          }
-        }
-      }
-    });
-  }
-
-  // Achievement chart
-  const updateAchChart = () => {
-    if (!achChartRef.current) return
-    const ctx = achChartRef.current.getContext("2d")
-    if (!ctx) return
-    const chartInstance = Chart.getChart(achChartRef.current)
-    if (chartInstance) chartInstance.destroy()
-    const sortedData = [...selectedBranchsData].sort((a, b) => b.total - a.total)
-    new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: sortedData.map((o) => o.name),
-        datasets: [
-          {
-            type: "bar",
-            label: "Total",
-            data: sortedData.map((o) => o.total),
-            backgroundColor: "#FF6347",
-            order: 1,
-            yAxisID: "y",
-          },
-          {
-            type: "line",
-            label: "% ACH",
-            data: sortedData.map((o) => o.achPercentage),
-            borderColor: "#800080",
-            borderWidth: 2,
-            pointBackgroundColor: "#800080",
-            pointRadius: 4,
-            fill: false,
-            order: 0,
-            yAxisID: "y1",
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: { type: "linear", position: "left", beginAtZero: true, title: { display: true, text: "Total" } },
-          y1: { type: "linear", position: "right", beginAtZero: true, max: 100, title: { display: true, text: "% ACH" }, grid: { drawOnChartArea: false } },
-          x: { title: { display: true, text: "Branch" } },
-        },
-      },
-    })
-  }
-
   // Helper function to get color by index
   const getColorByIndex = (index: number) => {
     const colors = [
@@ -284,6 +116,37 @@ export default function BranchDetailPage() {
     ];
     return colors[index % colors.length];
   }
+
+  // Sort selected branches data by total orders descending (for all charts)
+  const sortedSelectedBranchsData = [...branchData.filter((o) => selectedBranchs.includes(o.name))].sort((a, b) => b.total - a.total)
+
+  // Data for Distribution (Bar Only)
+  const barOnlyChartData = sortedSelectedBranchsData.map((o, i) => ({
+    label: o.name,
+    value: o.total,
+    color: getColorByIndex(i),
+  }))
+
+  // Data for Complete (Pie)
+  const totalCompletionsAll = sortedSelectedBranchsData.reduce((sum, o) => sum + o.complete, 0)
+  const pieChartData = sortedSelectedBranchsData.map((o, i) => ({
+    status: o.name,
+    percentage: totalCompletionsAll > 0 ? (o.complete / totalCompletionsAll) * 100 : 0,
+    color: getColorByIndex(i),
+  }))
+
+  // Data for Achievement (Bar+Line)
+  const barChartData = sortedSelectedBranchsData.map((o) => ({
+    month: o.name,
+    totalOrders: o.total,
+    achPercentage: o.achPercentage,
+  }))
+
+  // Calculate totals for selected branches
+  const totalOrders = sortedSelectedBranchsData.reduce((sum, o) => sum + o.total, 0)
+  const totalComplete = sortedSelectedBranchsData.reduce((sum, o) => sum + o.complete, 0)
+  const totalFailed = sortedSelectedBranchsData.reduce((sum, o) => sum + o.failed, 0)
+  const overallAchPercentage = totalOrders > 0 ? ((totalComplete / totalOrders) * 100).toFixed(2) : "0.00"
 
   if (loading) {
     return (
@@ -298,69 +161,26 @@ export default function BranchDetailPage() {
     <div className="flex flex-col h-full">
       <DynamicHeader />
       <div className="p-6 space-y-6 bg-gray-50 flex-1">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center mb-2 px-2 py-2 rounded-lg bg-white/70 shadow-sm border border-gray-100">
           <div className="flex items-center gap-2">
-            <span className="font-medium">Update</span>
-            <LastUpdatedDate className="text-red-600 border-b-2 border-red-600" dateFormat="date" />
+            <span className="font-semibold text-gray-700 tracking-tight text-sm">Last Update</span>
+            <LastUpdatedDate className="text-rose-600 font-semibold px-2 py-0.5 rounded bg-rose-50 border border-rose-100 text-xs" dateFormat="date" />
           </div>
-          <div className="text-right">
-            <span className="text-red-600 font-medium">Month to Date</span>
-          </div>
+          <span className="text-xs font-medium text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-100 shadow-sm">Month to Date</span>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          <Card className="bg-blue-600 text-white">
-            <CardContent className="p-4">
-              <div className="text-sm font-medium">Total Orders</div>
-              <div className="text-3xl font-bold mt-1">{totalOrders}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-green-600 text-white">
-            <CardContent className="p-4">
-              <div className="text-sm font-medium">Total Complete</div>
-              <div className="text-3xl font-bold mt-1">{totalComplete}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-red-600 text-white">
-            <CardContent className="p-4">
-              <div className="text-sm font-medium">Total Failed</div>
-              <div className="text-3xl font-bold mt-1">{totalFailed}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-orange-500 text-white">
-            <CardContent className="p-4">
-              <div className="text-sm font-medium">Overall % ACH</div>
-              <div className="text-3xl font-bold mt-1">{overallAchPercentage}%</div>
-            </CardContent>
-          </Card>
+          <CloneStatCard title="Total Orders" value={totalOrders} className="bg-blue-600 text-white" />
+          <CloneStatCard title="Total Complete" value={totalComplete} className="bg-green-600 text-white" />
+          <CloneStatCard title="Total Failed" value={totalFailed} className="bg-red-600 text-white" />
+          <CloneStatCard title="Overall % ACH" value={`${overallAchPercentage}%`} className="bg-orange-500 text-white" />
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <Card>
-                <CardContent className="p-4">
-                  <h2 className="text-lg font-medium mb-4">Branch Distribution</h2>
-                  <div className="h-[300px] w-full">
-                    <canvas ref={barChartRef} />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <h2 className="text-lg font-medium mb-4">Complete (%)</h2>
-                  <div className="h-[300px] w-full">
-                    <canvas ref={pieChartRef} />
-                  </div>
-                </CardContent>
-              </Card>
+              <CloneBarOnlyChart data={barOnlyChartData} title="Branch Distribution" />
+              <ClonePieChart data={pieChartData} title="Complete (%)" />
             </div>
-            <Card>
-              <CardContent className="p-4">
-                <h2 className="text-lg font-medium mb-4">Branch Achievement</h2>
-                <div className="h-[300px] w-full">
-                  <canvas ref={achChartRef} />
-                </div>
-              </CardContent>
-            </Card>
+            <CloneBarChart data={barChartData} title="Branch Achievement" />
           </div>
           <div className="lg:col-span-1">
             <Card className="h-full">
@@ -427,12 +247,7 @@ export default function BranchDetailPage() {
             </Card>
           </div>
         </div>
-        <Card>
-          <CardContent className="p-4 prose max-w-none">
-            <h2 className="text-lg font-medium">Insight Branch</h2>
-            <p className="text-base">{insightOrder}</p>
-          </CardContent>
-        </Card>
+        <CloneInsightCard title="Insight Branch" text={insightOrder} />
         <LastUpdatedFooter />
       </div>
     </div>

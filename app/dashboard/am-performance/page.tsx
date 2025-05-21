@@ -10,7 +10,20 @@ import { ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
 import { LastUpdatedDate, LastUpdatedFooter } from "@/components/dashboard/last-updated"
 import Loading from "@/components/ui/loading"
+import { CloneStatCard } from "@/components/dashboard/clone-stat-card"
+import { ClonePieChart } from "@/components/dashboard/clone-pie-chart"
+import { CloneBarChart } from "@/components/dashboard/clone-bar-chart"
+import { CloneBarOnlyChart } from "@/components/dashboard/clone-baronly-chart"
+import { CloneInsightCard } from "@/components/dashboard/clone-insight-card"
 Chart.register(...registerables)
+
+// Helper function to get color by index
+const getColorByIndex = (index: number) => {
+  const colors = [
+    "#333333", "#4B0082", "#006400", "#FF1493", "#FF4500", "#32CD32", "#FF8C00", "#1E90FF", "#8B008B", "#2F4F4F", "#FFD700", "#00CED1", "#DC143C", "#A0522D", "#20B2AA", "#B22222", "#FF6347", "#4682B4", "#008B8B", "#B8860B", "#C71585", "#556B2F", "#8B0000", "#483D8B", "#008080", "#BDB76B", "#9932CC", "#FF00FF", "#00FF7F", "#191970", "#FFA07A", "#7CFC00", "#D2691E", "#6495ED", "#40E0D0", "#FFB6C1", "#A9A9A9", "#F08080", "#E9967A", "#00FA9A", "#8FBC8F", "#CD5C5C", "#BA55D3", "#B0C4DE", "#FFDAB9", "#E6E6FA", "#B0E0E6", "#D8BFD8", "#DDA0DD", "#F5DEB3", "#FFFACD", "#F0E68C", "#E0FFFF", "#FAFAD2", "#FFE4E1", "#F5F5DC", "#FFF0F5", "#F5FFFA", "#F0FFF0", "#F8F8FF", "#FFF5EE", "#F5F5F5", "#FDF5E6", "#FFFAFA", "#FFFFF0", "#FAEBD7", "#FFE4B5", "#FFEBCD", "#FFEFD5", "#FFF8DC"
+  ];
+  return colors[index % colors.length];
+}
 
 // Fungsi untuk fetch data AM dari Google Sheets
 async function fetchAMData() {
@@ -118,310 +131,31 @@ export default function AMPerformancePage() {
     setSelectedAMs([])
   }
 
-  // Update charts when selected AMs change
-  useEffect(() => {
-    updateBarChart()
-    updatePieChart()
-    updateAchChart()
-  }, [selectedAMs])
 
-  // Bar chart for total orders
-  const updateBarChart = () => {
-    if (!barChartRef.current) return
+  // Sort selected AMs data by total orders descending (for all charts)
+  const sortedSelectedAMsData = [...selectedAMsData].sort((a, b) => b.total - a.total)
 
-    const ctx = barChartRef.current.getContext("2d")
-    if (!ctx) return
+  // Data for Distribution (Bar Only)
+  const barOnlyChartData = sortedSelectedAMsData.map((am, i) => ({
+    label: am.name,
+    value: am.total,
+    color: getColorByIndex(i),
+  }))
 
-    // Destroy existing chart
-    const chartInstance = Chart.getChart(barChartRef.current)
-    if (chartInstance) {
-      chartInstance.destroy()
-    }
+  // Data for Complete (Pie)
+  const totalCompletionsAll = sortedSelectedAMsData.reduce((sum, am) => sum + am.complete, 0)
+  const pieChartData = sortedSelectedAMsData.map((am, i) => ({
+    status: am.name,
+    percentage: totalCompletionsAll > 0 ? (am.complete / totalCompletionsAll) * 100 : 0,
+    color: getColorByIndex(i),
+  }))
 
-    // Sort data by total orders (descending)
-    const sortedData = [...selectedAMsData].sort((a, b) => b.total - a.total)
-
-    new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: sortedData.map((am) => am.name.split(",")[0]), // Use first part of name
-        datasets: [
-          {
-            label: "Total Orders",
-            data: sortedData.map((am) => am.total),
-            backgroundColor: sortedData.map((_, i) => getColorByIndex(i)),
-            borderWidth: 0,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            beginAtZero: true,
-            title: {
-              display: true,
-              text: "Total",
-            },
-          },
-          x: {
-            title: {
-              display: true,
-              text: "Account Manager",
-            },
-          },
-        },
-        plugins: {
-          legend: {
-            display: false,
-          },
-        },
-      },
-    })
-  }
-
-  // Pie chart for completion percentage
-  const updatePieChart = () => {
-    if (!pieChartRef.current) return
-
-    const ctx = pieChartRef.current.getContext("2d")
-    if (!ctx) return
-
-    // Destroy existing chart
-    const pieChartInstance = Chart.getChart(pieChartRef.current)
-    if (pieChartInstance) {
-      pieChartInstance.destroy()
-    }
-
-    // Hitung persentase complete dari semua AM yang dipilih
-    const totalCompletionsAll = selectedAMsData.reduce((sum, am) => sum + am.complete, 0)
-    // Urutkan selectedAMsData dari persentase terbesar
-    const sortedAMsForPie = [...selectedAMsData].sort((a, b) => {
-      const pa = totalCompletionsAll > 0 ? (a.complete / totalCompletionsAll) * 100 : 0;
-      const pb = totalCompletionsAll > 0 ? (b.complete / totalCompletionsAll) * 100 : 0;
-      return pb - pa;
-    });
-    const labels = sortedAMsForPie.map((am) => am.name.split(",")[0]);
-    const dataPie = sortedAMsForPie.map((am) => totalCompletionsAll > 0 ? (am.complete / totalCompletionsAll) * 100 : 0);
-
-    new Chart(ctx, {
-      type: "pie",
-      data: {
-        labels: labels,
-        datasets: [
-          {
-            data: dataPie,
-            backgroundColor: labels.map((_, i) => getColorByIndex(i)),
-            borderWidth: 0
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: "right",
-            labels: {
-              usePointStyle: true,
-              pointStyle: "circle",
-              padding: 20,
-              font: {
-                size: 12
-              }
-            }
-          },
-          tooltip: {
-            callbacks: {
-              label: (context) => `${context.label}: ${Number(context.raw).toFixed(1)}%`
-            }
-          }
-        },
-        animation: {
-          onComplete: function () {
-            const chart = this as Chart;
-            const ctx = chart.ctx;
-            ctx.save();
-            chart.getDatasetMeta(0).data.forEach((arc: any, i: number) => {
-              const dataset = chart.data.datasets[0];
-              const value = dataset.data[i];
-              if (typeof value === 'number' && value > 10) {
-                const props = arc.getProps(['startAngle', 'endAngle', 'outerRadius', 'innerRadius', 'x', 'y'], true);
-                const midAngle = (props.startAngle + props.endAngle) / 2;
-                const radius = (props.outerRadius + props.innerRadius) / 2;
-                const x = props.x + Math.cos(midAngle) * radius * 0.7;
-                const y = props.y + Math.sin(midAngle) * radius * 0.7;
-                ctx.fillStyle = '#222';
-                ctx.font = 'bold 16px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(`${Math.round(value)}%`, x, y);
-              }
-            });
-            ctx.restore();
-          }
-        }
-      }
-    });
-  }
-
-  // Achievement chart
-  const updateAchChart = () => {
-    if (!achChartRef.current) return
-
-    const ctx = achChartRef.current.getContext("2d")
-    if (!ctx) return
-
-    // Destroy existing chart
-    const chartInstance = Chart.getChart(achChartRef.current)
-    if (chartInstance) {
-      chartInstance.destroy()
-    }
-
-    // Sort data by total orders (descending)
-    const sortedData = [...selectedAMsData].sort((a, b) => b.total - a.total)
-
-    new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels: sortedData.map((am) => am.name.split(",")[0]),
-        datasets: [
-          {
-            type: "bar",
-            label: "Total",
-            data: sortedData.map((am) => am.total),
-            backgroundColor: "red",
-            order: 1,
-            yAxisID: "y",
-          },
-          {
-            type: "line",
-            label: "% ACH",
-            data: sortedData.map((am) => am.achPercentage),
-            borderColor: "#FF9999",
-            borderWidth: 2,
-            pointBackgroundColor: "#FF9999",
-            pointRadius: 4,
-            fill: false,
-            order: 0,
-            yAxisID: "y1",
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: {
-            type: "linear",
-            position: "left",
-            beginAtZero: true,
-            title: {
-              display: true,
-              text: "Total",
-            },
-          },
-          y1: {
-            type: "linear",
-            position: "right",
-            beginAtZero: true,
-            max: 100,
-            title: {
-              display: true,
-              text: "% ACH",
-            },
-            grid: {
-              drawOnChartArea: false,
-            },
-          },
-          x: {
-            title: {
-              display: true,
-              text: "Account Manager",
-            },
-          },
-        },
-      },
-    })
-  }
-
-  // Helper function to get color by index
-  const getColorByIndex = (index: number) => {
-    const colors = [
-      "#333333", // Dark Gray
-      "#4B0082", // Indigo
-      "#006400", // Dark Green
-      "#FF1493", // Deep Pink
-      "#FF4500", // Orange Red
-      "#32CD32", // Lime Green
-      "#FF8C00", // Dark Orange
-      "#1E90FF", // Dodger Blue
-      "#8B008B", // Dark Magenta
-      "#2F4F4F", // Dark Slate Gray
-      "#FFD700", // Gold
-      "#00CED1", // Dark Turquoise
-      "#DC143C", // Crimson
-      "#A0522D", // Sienna
-      "#20B2AA", // Light Sea Green
-      "#B22222", // Fire Brick
-      "#FF6347", // Tomato
-      "#4682B4", // Steel Blue
-      "#008B8B", // Dark Cyan
-      "#B8860B", // Dark Goldenrod
-      "#C71585", // Medium Violet Red
-      "#556B2F", // Dark Olive Green
-      "#8B0000", // Dark Red
-      "#483D8B", // Dark Slate Blue
-      "#008080", // Teal
-      "#BDB76B", // Dark Khaki
-      "#9932CC", // Dark Orchid
-      "#FF00FF", // Magenta
-      "#00FF7F", // Spring Green
-      "#191970", // Midnight Blue
-      "#FFA07A", // Light Salmon
-      "#7CFC00", // Lawn Green
-      "#D2691E", // Chocolate
-      "#6495ED", // Cornflower Blue
-      "#40E0D0", // Turquoise
-      "#FFB6C1", // Light Pink
-      "#A9A9A9", // Dark Gray
-      "#F08080", // Light Coral
-      "#E9967A", // Dark Salmon
-      "#00FA9A", // Medium Spring Green
-      "#8FBC8F", // Dark Sea Green
-      "#CD5C5C", // Indian Red
-      "#BA55D3", // Medium Orchid
-      "#B0C4DE", // Light Steel Blue
-      "#FFDAB9", // Peach Puff
-      "#E6E6FA", // Lavender
-      "#B0E0E6", // Powder Blue
-      "#D8BFD8", // Thistle
-      "#DDA0DD", // Plum
-      "#F5DEB3", // Wheat
-      "#FFFACD", // Lemon Chiffon
-      "#F0E68C", // Khaki
-      "#E0FFFF", // Light Cyan
-      "#FAFAD2", // Light Goldenrod Yellow
-      "#FFE4E1", // Misty Rose
-      "#F5F5DC", // Beige
-      "#FFF0F5", // Lavender Blush
-      "#F5FFFA", // Mint Cream
-      "#F0FFF0", // Honeydew
-      "#F8F8FF", // Ghost White
-      "#FFF5EE", // Seashell
-      "#F5F5F5", // White Smoke
-      "#FDF5E6", // Old Lace
-      "#FFFAFA", // Snow
-      "#FFFFF0", // Ivory
-      "#FAEBD7", // Antique White
-      "#FFE4B5", // Moccasin
-      "#FFEBCD", // Blanched Almond
-      "#FFEFD5", // Papaya Whip
-      "#FFF8DC" // Cornsilk
-    ];
-    return colors[index % colors.length];
-  }
+  // Data for Achievement (Bar+Line)
+  const barChartData = sortedSelectedAMsData.map((am) => ({
+    month: am.name,
+    totalOrders: am.total,
+    achPercentage: am.achPercentage,
+  }))
 
   if (loading) {
     return (
@@ -435,82 +169,30 @@ export default function AMPerformancePage() {
   return (
     <div className="flex flex-col h-full">
       <DynamicHeader />
-
       <div className="p-6 space-y-6 bg-gray-50 flex-1">
-        <div className="flex justify-between items-center">
+        
+        <div className="flex justify-between items-center mb-2 px-2 py-2 rounded-lg bg-white/70 shadow-sm border border-gray-100">
           <div className="flex items-center gap-2">
-            <span className="font-medium">Update</span>
-            <LastUpdatedDate className="text-red-600 border-b-2 border-red-600" dateFormat="date" />
+            <span className="font-semibold text-gray-700 tracking-tight text-sm">Last Update</span>
+            <LastUpdatedDate className="text-rose-600 font-semibold px-2 py-0.5 rounded bg-rose-50 border border-rose-100 text-xs" dateFormat="date" />
           </div>
-          <div className="text-right">
-            <span className="text-red-600 font-medium">Month to Date</span>
-          </div>
+          <span className="text-xs font-medium text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-100 shadow-sm">Month to Date</span>
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          {/* Stat Cards */}
-          <Card className="bg-blue-600 text-white">
-            <CardContent className="p-4">
-              <div className="text-sm font-medium">Total Orders</div>
-              <div className="text-3xl font-bold mt-1">{totalOrders}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-green-600 text-white">
-            <CardContent className="p-4">
-              <div className="text-sm font-medium">Total Complete</div>
-              <div className="text-3xl font-bold mt-1">{totalComplete}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-red-600 text-white">
-            <CardContent className="p-4">
-              <div className="text-sm font-medium">Total Failed</div>
-              <div className="text-3xl font-bold mt-1">{totalFailed}</div>
-            </CardContent>
-          </Card>
-          <Card className="bg-orange-500 text-white">
-            <CardContent className="p-4">
-              <div className="text-sm font-medium">Overall % ACH</div>
-              <div className="text-3xl font-bold mt-1">{overallAchPercentage}%</div>
-            </CardContent>
-          </Card>
+          <CloneStatCard title="Total Orders" value={totalOrders} className="bg-blue-600 text-white" />
+          <CloneStatCard title="Total Complete" value={totalComplete} className="bg-green-600 text-white" />
+          <CloneStatCard title="Total Failed" value={totalFailed} className="bg-red-600 text-white" />
+          <CloneStatCard title="Overall % ACH" value={`${overallAchPercentage}%`} className="bg-orange-500 text-white" />
         </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-3">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              {/* Bar Chart */}
-              <Card>
-                <CardContent className="p-4">
-                  <h2 className="text-lg font-medium mb-4">AM Distribution</h2>
-                  <div className="h-[300px] w-full">
-                    <canvas ref={barChartRef} />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Pie Chart */}
-              <Card>
-                <CardContent className="p-4">
-                  <h2 className="text-lg font-medium mb-4">Complete (%)</h2>
-                  <div className="h-[300px] w-full">
-                    <canvas ref={pieChartRef} />
-                  </div>
-                </CardContent>
-              </Card>
+              <CloneBarOnlyChart data={barOnlyChartData} title="AM Distribution" />
+              <ClonePieChart data={pieChartData} title="Complete (%)" />
             </div>
-
-            {/* Achievement Chart */}
-            <Card>
-              <CardContent className="p-4">
-                <h2 className="text-lg font-medium mb-4">AM Achievement</h2>
-                <div className="h-[300px] w-full">
-                  <canvas ref={achChartRef} />
-                </div>
-              </CardContent>
-            </Card>
+            <CloneBarChart data={barChartData} title="AM Achievement" />
           </div>
-
-          {/* AM Selection Panel */}
+          {/* ...existing selection panel code unchanged... */}
           <div className="lg:col-span-1">
             <Card className="h-full">
               <div className="bg-red-600 text-white p-3 flex justify-between items-center">
@@ -579,16 +261,7 @@ export default function AMPerformancePage() {
             </Card>
           </div>
         </div>
-
-        {/* Insight Card */}
-        <Card>
-          <CardContent className="p-4 prose max-w-none">
-            <h2 className="text-lg font-medium">Insight AM</h2>
-            <p className="text-base">{insightAM}</p>
-          </CardContent>
-        </Card>
-
-        {/* Footer */}
+        <CloneInsightCard title="Insight AM" text={insightAM} />
         <LastUpdatedFooter />
       </div>
     </div>
