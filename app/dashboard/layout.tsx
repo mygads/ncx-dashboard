@@ -78,21 +78,32 @@ export default function DashboardLayout({
         <svg className="absolute left-0 top-0 w-40 h-40 opacity-20 pointer-events-none" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="100" cy="100" r="100" fill="url(#paint0_radial)" />
           <defs>
-            <radialGradient id="paint0_radial" cx="0" cy="0" r="1" gradientTransform="translate(100 100) scale(100)" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#60A5FA" />
-              <stop offset="1" stopColor="#fff" stopOpacity="0" />
-            </radialGradient>
+        <radialGradient id="paint0_radial" cx="0" cy="0" r="1" gradientTransform="translate(100 100) scale(100)" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#60A5FA" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
           </defs>
         </svg>
         {/* Decorative SVG bottom right */}
         <svg className="absolute right-0 bottom-0 w-40 h-40 opacity-20 pointer-events-none" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
           <rect x="0" y="0" width="200" height="200" rx="100" fill="url(#paint1_radial)" />
           <defs>
-            <radialGradient id="paint1_radial" cx="0" cy="0" r="1" gradientTransform="translate(100 100) scale(100)" gradientUnits="userSpaceOnUse">
-              <stop stopColor="#818CF8" />
-              <stop offset="1" stopColor="#fff" stopOpacity="0" />
-            </radialGradient>
+        <radialGradient id="paint1_radial" cx="0" cy="0" r="1" gradientTransform="translate(100 100) scale(100)" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#818CF8" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </radialGradient>
           </defs>
+        </svg>
+        {/* Extra decorative blurred gradient blob */}
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[300px] bg-gradient-to-r from-blue-200 via-indigo-200 to-purple-200 opacity-30 rounded-full blur-3xl pointer-events-none z-0" />
+        {/* Subtle grid pattern overlay */}
+        <svg className="absolute inset-0 w-full h-full opacity-10 pointer-events-none z-0" width="100%" height="100%">
+          <defs>
+        <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#a5b4fc" strokeWidth="1"/>
+        </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid)" />
         </svg>
         <div className="md:hidden flex items-center p-4 border-b relative z-10">
           <MobileSidebar />
