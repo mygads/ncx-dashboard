@@ -140,6 +140,15 @@ async function fetchTargetAMData(slug?: string): Promise<TargetAMData[]> {
   }
 }
 
+// Helper to get AM photo URL from Supabase bucket
+function getAMPhotoUrl(name: string) {
+  if (!name) return "/placeholder.svg?height=300&width=250";
+  // Nama file di bucket: nama AM persis, dengan ekstensi .png
+  // Perlu encodeURIComponent untuk handle spasi dan karakter khusus
+  const encodedName = encodeURIComponent(name);
+  return `https://tgftiktwtqyqpcrofevj.supabase.co/storage/v1/object/public/profile/${encodedName}.png`;
+}
+
 export default function TargetAMPage() {
   const [loading, setLoading] = useState(true)
   const [amList, setAmList] = useState<TargetAMData[]>([])
@@ -331,7 +340,7 @@ export default function TargetAMPage() {
             {/* Right Column */}
             <div className="space-y-6">
               {/* Sales Operasional Section */}
-              <div>
+              <div className="mb-20">
                 <div className="bg-red-600 text-white p-2 text-center rounded-3xl mb-4">
                   <h2 className="text-2xl font-bold">SALES OPERASIONAL</h2>
                 </div>
@@ -359,16 +368,20 @@ export default function TargetAMPage() {
               </div>
 
               {/* AM Photo - Positioned to match the image */}
-              <div className="flex justify-end">
-                <div className="relative">
-                  <Image
-                    src="/placeholder.svg?height=300&width=250"
-                    alt={currentAM.name}
-                    width={250}
-                    height={300}
-                    className="object-cover"
-                  />
-                  <div className="absolute bottom-0 left-0 right-0 bg-red-600 text-white p-2 text-center">
+              <div className="flex flex-col items-end justify-end">
+                <div className="w-[250px] h-[350px] rounded-lg overflow-hidden shadow relative flex flex-col">
+                  <div className="w-full h-[250px] relative">
+                    <Image
+                      src={getAMPhotoUrl(currentAM.name)}
+                      alt={currentAM.name}
+                      width={250}
+                      height={250}
+                      className="object-cover object-top w-full h-full"
+                      style={{ objectFit: "cover", objectPosition: "top" }}
+                      onError={(e: any) => { e.target.src = "/placeholder.svg?height=300&width=250"; }}
+                    />
+                  </div>
+                  <div className="bg-red-600 text-white p-2 text-center shadow-lg flex-1 flex flex-col justify-center">
                     <h3 className="font-bold">{currentAM.name}</h3>
                     <p>NIK: {currentAM.nik}</p>
                   </div>
