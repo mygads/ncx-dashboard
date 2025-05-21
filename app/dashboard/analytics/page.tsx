@@ -3,9 +3,11 @@
 import { useEffect, useState, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Chart, registerables } from "chart.js"
+// @ts-ignore
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
 import { LastUpdatedDate, LastUpdatedFooter } from "@/components/dashboard/last-updated"
-Chart.register(...registerables)
+Chart.register(...registerables, ChartDataLabels)
 
 // Define Google Maps global types
 declare global {
@@ -16,10 +18,10 @@ declare global {
 }
 
 type ProgressType = {
-  COMPLETE: number;
-  "IN PROGRESS": number;
-  "PENDING BASO": number;
-  "PENDING BILLING APROVAL": number;
+  COMPLETE: number | string;
+  "IN PROGRESS": number | string;
+  "PENDING BASO": number | string;
+  "PENDING BILLING APROVAL": number | string;
 };
 
 // Fungsi untuk fetch data dari Google Sheets
@@ -31,17 +33,17 @@ async function fetchProgressData(): Promise<ProgressType> {
   const res = await fetch(url);
   const json = await res.json();
   if (!json.values || json.values.length < 2) return {
-    COMPLETE: 0,
-    "IN PROGRESS": 0,
-    "PENDING BASO": 0,
-    "PENDING BILLING APROVAL": 0,
+    COMPLETE: "-",
+    "IN PROGRESS": "-",
+    "PENDING BASO": "-",
+    "PENDING BILLING APROVAL": "-",
   };
   const rows: [string, string][] = json.values.slice(1); // skip header
   const result: ProgressType = {
-    COMPLETE: 0,
-    "IN PROGRESS": 0,
-    "PENDING BASO": 0,
-    "PENDING BILLING APROVAL": 0,
+    COMPLETE: '-',
+    "IN PROGRESS": '-',
+    "PENDING BASO": '-',
+    "PENDING BILLING APROVAL": '-',
   };
   rows.forEach(([status, count]) => {
     const key = status.trim().toUpperCase() as keyof ProgressType;
@@ -60,7 +62,7 @@ async function fetchUnitSummary() {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
   const res = await fetch(url);
   const json = await res.json();
-  if (!json.values || json.values.length < 2) return { totalFailed: 0, overallAchPercentage: 0 };
+  if (!json.values || json.values.length < 2) return { totalFailed: '-', overallAchPercentage: '-' };
   const rows = json.values.slice(1); // skip header
   let totalFailed = 0;
   let achSum = 0;
@@ -78,8 +80,8 @@ async function fetchUnitSummary() {
     totalFailed += failed;
   });
   return {
-    totalFailed,
-    overallAchPercentage: achCount > 0 ? (achSum / achCount) : 0,
+    totalFailed: totalFailed.toString(),
+    overallAchPercentage: achCount > 0 ? (achSum / achCount).toFixed(2) : '-',
   };
 }
 
@@ -91,7 +93,7 @@ async function fetchYTDProgress() {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
   const res = await fetch(url);
   const json = await res.json();
-  if (!json.values || json.values.length < 2) return { monthlyData: [], ordersCompleteYTD: 0, achLastMonth: 0 };
+  if (!json.values || json.values.length < 2) return { monthlyData: [], ordersCompleteYTD: '-', achLastMonth: 0 };
   const rows = json.values.slice(1); // skip header
   // Ambil tahun sekarang
   const now = new Date();
@@ -120,33 +122,56 @@ async function fetchYTDProgress() {
     let monthLabel = monthNames[Number(monthNum) - 1] + " " + year;
     return { month: monthLabel, totalOrders, achPercentage };
   });
-  return { monthlyData, ordersCompleteYTD, achLastMonth };
+  return { monthlyData, ordersCompleteYTD: ordersCompleteYTD.toString(), achLastMonth };
+}
+
+async function FetchHotdaData() {
+  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
+  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
+  const sheetName = 'BRANCH NCX';
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!json.values || json.values.length < 2) return [];
+  const rows = json.values.slice(1); // skip header
+  return rows.map((cols: string[]) => ({
+    location: cols[0] || "",
+    count: Number(cols[1]) || 0,
+  }));
 }
 
 export default function AnalyticsDashboard() {
   const pieChartRef = useRef<HTMLCanvasElement>(null)
   const barChartRef = useRef<HTMLCanvasElement>(null)
+  const hotdaBarChartRef = useRef<HTMLCanvasElement>(null)
 
   // State untuk data progress dari Google Sheets
   const [progress, setProgress] = useState<ProgressType>({
-    COMPLETE: 0,
-    "IN PROGRESS": 0,
-    "PENDING BASO": 0,
-    "PENDING BILLING APROVAL": 0,
+    COMPLETE: '-',
+    "IN PROGRESS": '-',
+    "PENDING BASO": '-',
+    "PENDING BILLING APROVAL": '-',
   });
 
-  const [unitSummary, setUnitSummary] = useState({ totalFailed: 0, overallAchPercentage: 0 });
-  const [ytdProgress, setYtdProgress] = useState({ monthlyData: [], ordersCompleteYTD: 0, achLastMonth: 0 });
+  const [unitSummary, setUnitSummary] = useState<{ totalFailed: string; overallAchPercentage: string | number }>({ totalFailed: '-', overallAchPercentage: '-' });
+  const [ytdProgress, setYtdProgress] = useState<{ monthlyData: any[]; ordersCompleteYTD: string; achLastMonth: string }>({ monthlyData: [], ordersCompleteYTD: '-', achLastMonth: '-' });
+  const [hotdaData, setHotdaData] = useState<{ location: string; count: number }[]>([]);
 
   // Fetch data dari Google Sheets saat mount
   useEffect(() => {
     fetchProgressData().then(setProgress);
     fetchUnitSummary().then(setUnitSummary);
-    fetchYTDProgress().then(setYtdProgress);
+    fetchYTDProgress().then((result) =>
+      setYtdProgress({
+        ...result,
+        achLastMonth: result.achLastMonth.toString(),
+      })
+    );
+    FetchHotdaData().then(setHotdaData);
   }, []);
 
   // Build data object using progress
-  const totalOrders = progress.COMPLETE + progress["IN PROGRESS"] + progress["PENDING BASO"] + progress["PENDING BILLING APROVAL"];
+  const totalOrders = Number(progress.COMPLETE) + Number(progress["IN PROGRESS"]) + Number(progress["PENDING BASO"]) + Number(progress["PENDING BILLING APROVAL"]);
   const data = {
     totalOrders,
     inProgress: progress["IN PROGRESS"],
@@ -154,14 +179,16 @@ export default function AnalyticsDashboard() {
     pendingBillingApproval: progress["PENDING BILLING APROVAL"],
     totalComplete: progress.COMPLETE,
     totalFailed: unitSummary.totalFailed,
-    overallAchPercentage: unitSummary.overallAchPercentage.toFixed(2),
+    overallAchPercentage: typeof unitSummary.overallAchPercentage === "number"
+      ? unitSummary.overallAchPercentage.toFixed(2)
+      : unitSummary.overallAchPercentage,
     ordersCompleteYTD: ytdProgress.ordersCompleteYTD,
     achLastMonth: ytdProgress.achLastMonth,
     progressData: [
-      { status: "PENDING BASO", percentage: totalOrders ? (progress["PENDING BASO"] / totalOrders) * 100 : 0, color: "#4169E1" },
-      { status: "IN PROGRESS", percentage: totalOrders ? (progress["IN PROGRESS"] / totalOrders) * 100 : 0, color: "#FFA500" },
-      { status: "COMPLETE", percentage: totalOrders ? (progress.COMPLETE / totalOrders) * 100 : 0, color: "#32CD32" },
-      { status: "PENDING BILLING APROVAL", percentage: totalOrders ? (progress["PENDING BILLING APROVAL"] / totalOrders) * 100 : 0, color: "#DC3545" },
+      { status: "PENDING BASO", percentage: totalOrders ? (Number(progress["PENDING BASO"]) / totalOrders) * 100 : 0, color: "#4169E1" },
+      { status: "IN PROGRESS", percentage: totalOrders ? (Number(progress["IN PROGRESS"]) / totalOrders) * 100 : 0, color: "#FFA500" },
+      { status: "COMPLETE", percentage: totalOrders ? (Number(progress.COMPLETE) / totalOrders) * 100 : 0, color: "#32CD32" },
+      { status: "PENDING BILLING APROVAL", percentage: totalOrders ? (Number(progress["PENDING BILLING APROVAL"]) / totalOrders) * 100 : 0, color: "#DC3545" },
     ],
     monthlyData: ytdProgress.monthlyData.length ? ytdProgress.monthlyData : [
       { month: "Jan 2025", totalOrders: 0, achPercentage: 0 },
@@ -258,31 +285,42 @@ export default function AnalyticsDashboard() {
   }, [data.progressData]);
 
   useEffect(() => {
-    // Create bar chart
+    // Create bar chart for Orders Complete YTD with MoM Orders growth line
     if (barChartRef.current) {
-      const ctx = barChartRef.current.getContext("2d")
+      const ctx = barChartRef.current.getContext("2d");
       if (ctx) {
+        // Calculate MoM Orders growth percentage
+        const orders = data.monthlyData.map((item: any) => item.totalOrders);
+        const momOrdersGrowth = orders.map((val: number, idx: number, arr: number[]) => {
+          if (idx === 0) return 0;
+          const prev = arr[idx - 1];
+          if (prev === 0) return 0;
+          return Number((((val - prev) / prev) * 100).toFixed(2));
+        });
         const barChart = new Chart(ctx, {
           type: "bar",
           data: {
-            labels: data.monthlyData.map((item) => item.month.split(" ")[0] + " " + item.month.split(" ")[1]),
+            labels: data.monthlyData.map((item: any) => item.month.split(" ")[0] + " " + item.month.split(" ")[1]),
             datasets: [
               {
                 type: "bar",
                 label: "Total Orders Complete",
-                data: data.monthlyData.map((item) => item.totalOrders),
-                backgroundColor: "#32CD32",
+                data: orders,
+                backgroundColor: "#6366f1", // fixed indigo color
                 order: 1,
                 yAxisID: "y",
               },
               {
                 type: "line",
-                label: "% Ach Month per Month",
-                data: data.monthlyData.map((item) => item.achPercentage),
-                borderColor: "#800080",
-                borderWidth: 2,
-                pointBackgroundColor: "#800080",
-                pointRadius: 4,
+                label: "% MoM Orders Growth",
+                data: momOrdersGrowth,
+                borderColor: "#f43f5e",
+                backgroundColor: "#f43f5e",
+                borderWidth: 3,
+                pointBackgroundColor: "#f59e42",
+                pointBorderColor: "#fff",
+                pointRadius: 5,
+                pointHoverRadius: 7,
                 fill: false,
                 order: 0,
                 yAxisID: "y1",
@@ -292,6 +330,44 @@ export default function AnalyticsDashboard() {
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: "top",
+              },
+              tooltip: {
+                enabled: true,
+                callbacks: {
+                  label: function(context: any) {
+                    if (context.dataset.label === "% MoM Orders Growth") {
+                      return `${context.label}: ${context.raw}%`;
+                    }
+                    return `${context.label}: ${context.raw}`;
+                  },
+                },
+              },
+              datalabels: {
+                display: true,
+                color: function(context: any) {
+                  return context.dataset.type === 'bar' ? '#222' : '#f43f5e';
+                },
+                font: {
+                  weight: 'bold',
+                  size: 13,
+                },
+                anchor: function(context: any) {
+                  return context.dataset.type === 'bar' ? 'end' : 'start';
+                },
+                align: function(context: any) {
+                  return context.dataset.type === 'bar' ? 'end' : 'start';
+                },
+                formatter: function(value: number, context: any) {
+                  if (context.dataset.type === 'bar') {
+                    return value;
+                  }
+                  return value + '%';
+                },
+              },
+            },
             scales: {
               y: {
                 type: "linear",
@@ -300,10 +376,9 @@ export default function AnalyticsDashboard() {
                   display: true,
                   text: "Total Orders Complete",
                 },
-                min: -500,
-                max: 500,
+                min: 0,
                 ticks: {
-                  stepSize: 250,
+                  stepSize: 50,
                 },
               },
               y1: {
@@ -311,12 +386,11 @@ export default function AnalyticsDashboard() {
                 position: "right",
                 title: {
                   display: true,
-                  text: "% Ach Month per Month",
+                  text: "% MoM Orders Growth",
                 },
-                min: -100,
-                max: 50,
                 ticks: {
-                  stepSize: 50,
+                  callback: function(value: string | number) { return value + "%"; },
+                  stepSize: 20,
                 },
                 grid: {
                   drawOnChartArea: false,
@@ -330,90 +404,61 @@ export default function AnalyticsDashboard() {
                 },
               },
             },
+          },
+          plugins: [ChartDataLabels],
+        });
+        return () => {
+          barChart.destroy();
+        };
+      }
+    }
+  }, [data.monthlyData]);
+
+  useEffect(() => {
+    if (hotdaBarChartRef.current && hotdaData.length > 0) {
+      const ctx = hotdaBarChartRef.current.getContext('2d');
+      if (ctx) {
+        const chart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: hotdaData.map((item) => item.location),
+            datasets: [
+              {
+                label: 'Total Orders',
+                data: hotdaData.map((item) => item.count),
+                backgroundColor: '#6366f1',
+                borderRadius: 6,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
             plugins: {
-              legend: {
-                position: "top",
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (context: any) => `${context.label}: ${context.raw} orders`,
+                },
+              },
+            },
+            scales: {
+              x: {
+                title: { display: true, text: 'HOTDA' },
+                ticks: { font: { size: 12 } },
+              },
+              y: {
+                title: { display: true, text: 'Total Orders' },
+                beginAtZero: true,
+                ticks: { stepSize: 10 },
               },
             },
           },
-        })
-
-        return () => {
-          barChart.destroy()
-        }
+        });
+        return () => chart.destroy();
       }
     }
-  }, [data.monthlyData])
-
-  // Initialize Google Maps
-  // useEffect(() => {
-  //   // Load Google Maps API script
-  //   const loadGoogleMapsScript = () => {
-  //     const script = document.createElement("script")
-  //     script.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap`
-  //     script.async = true
-  //     script.defer = true
-  //     document.head.appendChild(script)
-
-  //     // Define the global initMap function
-  //     window.initMap = () => {
-  //       const mapElement = document.getElementById("google-map")
-  //       if (mapElement) {
-  //         // Center on Sulawesi
-  //         const map = new google.maps.Map(mapElement, {
-  //           center: { lat: -1.8312, lng: 120.0381 },
-  //           zoom: 6,
-  //           mapTypeId: "satellite",
-  //         })
-
-  //         // Add markers for each HOTDA
-  //         data.hotdaData.forEach((location) => {
-  //           const marker = new google.maps.Marker({
-  //             position: { lat: location.lat, lng: location.lng },
-  //             map: map,
-  //             icon: {
-  //               path: google.maps.SymbolPath.CIRCLE,
-  //               scale: Math.sqrt(location.count) * 0.5,
-  //               fillColor: "#FFFFFF",
-  //               fillOpacity: 0.6,
-  //               strokeWeight: 0.5,
-  //               strokeColor: "#000000",
-  //             },
-  //           })
-
-  //           // Add info window
-  //           const infoWindow = new google.maps.InfoWindow({
-  //             content: `
-  //               <div style="padding: 10px; text-align: center;">
-  //                 <strong>${location.location}</strong><br>
-  //                 Total: ${location.count}
-  //               </div>
-  //             `,
-  //           })
-
-  //           marker.addListener("click", () => {
-  //             infoWindow.open(map, marker)
-  //           })
-  //         })
-  //       }
-  //     }
-  //   }
-
-  //   // Check if Google Maps API is already loaded
-  //   if (window.google && window.initMap) {
-  //     // If already loaded, just initialize the map
-  //     window.initMap()
-  //   } else {
-  //     loadGoogleMapsScript()
-  //   }    return () => {
-  //     // Clean up
-  //     if (window.google && typeof window.initMap === 'function') {
-  //       window.initMap = () => {};
-  //       // @ts-ignore
-  //       window.google = undefined;
-  //     }
-  //   }
-  // }, [data.hotdaData])
+  }, [hotdaData]);
 
   return (
     <div className="flex flex-col h-full">
@@ -481,12 +526,11 @@ export default function AnalyticsDashboard() {
               <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-pink-300/20 to-transparent rounded-b-lg" />
             </CardContent>
           </Card>
-
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Pie Chart */}
-            <Card className="col-span-1 relative overflow-hidden bg-gradient-to-br from-red-50 via-red-100 to-white shadow-lg border-0">
+            <Card className="col-span-1 relative overflow-hidden bg-white shadow-lg border-0">
               {/* Decorative gradient blob */}
 
               <CardContent className="p-4 relative z-10">
@@ -513,33 +557,28 @@ export default function AnalyticsDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Stats */}
           <div className="space-y-4">
-            <Card className="bg-green-600 text-white">
-              <CardContent className="p-4">
+            <Card className="relative overflow-hidden bg-gradient-to-br from-green-600 via-green-500 to-lime-400 text-white shadow-lg">
+              <CardContent className="p-4 flex flex-col h-24 justify-between">
                 <div className="text-sm font-medium">Orders Complete (YTD)</div>
-                <div className="text-3xl font-bold mt-1">{data.ordersCompleteYTD}</div>
+                <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.ordersCompleteYTD}</div>
+                <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-green-300/20 to-transparent rounded-b-lg" />
               </CardContent>
             </Card>
-            <Card className="bg-purple-800 text-white">
-              <CardContent className="p-4">
+            <Card className="relative overflow-hidden bg-gradient-to-br from-purple-900 via-fuchsia-700 to-pink-600 text-white shadow-lg">
+              <CardContent className="p-4 flex flex-col h-24 justify-between">
                 <div className="text-sm font-medium">Ach Last Month</div>
-                <div className="text-3xl font-bold mt-1">{data.achLastMonth}%</div>
+                <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.achLastMonth}%</div>
+                <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-pink-300/20 to-transparent rounded-b-lg" />
               </CardContent>
             </Card>
           </div>
 
-          {/* Google Maps */}
+          {/* HOTDA Bar Chart */}
           <Card className="col-span-2">
             <CardContent className="p-4">
               <h2 className="text-lg font-medium mb-4">Jumlah Orders berdasarkan HOTDA</h2>
-              <div id="google-map" className="h-[300px] w-full rounded-lg overflow-hidden"></div>
-              <div className="mt-2 text-xs text-gray-500 flex items-center justify-between">
-                <div>Total: 4</div>
-                <div className="flex items-center">
-                  <div className="w-2 h-2 rounded-full bg-gray-400 mr-1"></div>
-                  <div className="w-4 h-4 rounded-full bg-gray-400 mr-1"></div>
-                  <div className="w-6 h-6 rounded-full bg-gray-400 mr-1"></div>
-                  <span>113</span>
-                </div>
+              <div className="h-[300px] w-full">
+                <canvas ref={hotdaBarChartRef} />
               </div>
             </CardContent>
           </Card>
