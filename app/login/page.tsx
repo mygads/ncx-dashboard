@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
@@ -14,7 +14,15 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Wifi, Signal, Phone, Globe, Network } from 'lucide-react'
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
-export default function Login() {
+export default function Home() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
+  )
+}
+
+function LoginContent() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)

@@ -422,72 +422,82 @@ export default function AnalyticsDashboard() {
 
       {/* Dashboard Content */}
       <div className="p-6 space-y-6 bg-gray-50 flex-1">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center mb-2 px-2 py-2 rounded-lg bg-white/70 shadow-sm border border-gray-100">
           <div className="flex items-center gap-2">
-            <span className="font-medium">Update</span>
-            <LastUpdatedDate className="text-red-600 border-b-2 border-red-600" dateFormat="date" />
+            <span className="font-semibold text-gray-700 tracking-tight text-sm">Last Update</span>
+            <LastUpdatedDate className="text-rose-600 font-semibold px-2 py-0.5 rounded bg-rose-50 border border-rose-100 text-xs" dateFormat="date" />
           </div>
-          <div className="text-right">
-            <span className="text-red-600 font-medium">Month to Date</span>
-          </div>
+          <span className="text-xs font-medium text-rose-600 bg-rose-50 px-3 py-1 rounded-full border border-rose-100 shadow-sm">Month to Date</span>
         </div>
 
         {/* Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-4">
-          <Card className="bg-purple-800 text-white">
-            <CardContent className="p-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-4 relative">
+          <Card className="relative overflow-hidden bg-gradient-to-br from-purple-800 via-purple-700 to-purple-900 text-white shadow-lg">
+            <CardContent className="p-4 flex flex-col h-24 justify-between">
               <div className="text-sm font-medium">Total Orders</div>
-              <div className="text-3xl font-bold mt-1">{data.totalOrders}</div>
+              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.totalOrders}</div>
+              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-purple-400/20 to-transparent rounded-b-lg" />
             </CardContent>
           </Card>
-          <Card className="bg-orange-500 text-white">
-            <CardContent className="p-4">
+          <Card className="relative overflow-hidden bg-gradient-to-br from-orange-500 via-orange-400 to-yellow-500 text-white shadow-lg">
+            <CardContent className="p-4 flex flex-col h-24 justify-between">
               <div className="text-sm font-medium">In Progress</div>
-              <div className="text-3xl font-bold mt-1">{data.inProgress}</div>
+              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.inProgress}</div>
+              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-orange-300/20 to-transparent rounded-b-lg" />
             </CardContent>
           </Card>
-          <Card className="bg-blue-600 text-white">
-            <CardContent className="p-4">
+          <Card className="relative overflow-hidden bg-gradient-to-br from-blue-600 via-blue-500 to-blue-400 text-white shadow-lg">
+            <CardContent className="p-4 flex flex-col h-24 justify-between">
               <div className="text-sm font-medium">Pending BASO</div>
-              <div className="text-3xl font-bold mt-1">{data.pendingBaso}</div>
+              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.pendingBaso}</div>
+              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-blue-300/20 to-transparent rounded-b-lg" />
             </CardContent>
           </Card>
-          <Card className="bg-red-600 text-white">
-            <CardContent className="p-4">
+          <Card className="relative overflow-hidden bg-gradient-to-br from-red-600 via-red-500 to-pink-500 text-white shadow-lg">
+            <CardContent className="p-4 flex flex-col h-24 justify-between">
               <div className="text-sm font-medium">Pending Billing Approval</div>
-              <div className="text-3xl font-bold mt-1">{data.pendingBillingApproval}</div>
+              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.pendingBillingApproval}</div>
+              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-red-300/20 to-transparent rounded-b-lg" />
             </CardContent>
           </Card>
-          <Card className="bg-green-600 text-white">
-            <CardContent className="p-4">
+          <Card className="relative overflow-hidden bg-gradient-to-br from-green-600 via-green-500 to-lime-400 text-white shadow-lg">
+            <CardContent className="p-4 flex flex-col h-24 justify-between">
               <div className="text-sm font-medium">Total Complete</div>
-              <div className="text-3xl font-bold mt-1">{data.totalComplete}</div>
+              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.totalComplete}</div>
+              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-green-300/20 to-transparent rounded-b-lg" />
             </CardContent>
           </Card>
-          <Card className="bg-red-600 text-white">
-            <CardContent className="p-4">
+          <Card className="relative overflow-hidden bg-gradient-to-br from-red-700 via-red-600 to-red-400 text-white shadow-lg">
+            <CardContent className="p-4 flex flex-col h-24 justify-between">
               <div className="text-sm font-medium">Total Failed</div>
-              <div className="text-3xl font-bold mt-1">{data.totalFailed}</div>
+              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.totalFailed}</div>
+              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-red-300/20 to-transparent rounded-b-lg" />
             </CardContent>
           </Card>
-          <Card className="bg-purple-900 text-white">
-            <CardContent className="p-4">
+          <Card className="relative overflow-hidden bg-gradient-to-br from-purple-900 via-fuchsia-700 to-pink-600 text-white shadow-lg">
+            <CardContent className="p-4 flex flex-col h-24 justify-between">
               <div className="text-sm font-medium">Overall % ACH</div>
-              <div className="text-3xl font-bold mt-1">{data.overallAchPercentage}%</div>
+              <div className="absolute bottom-2 right-4 text-3xl font-bold">{data.overallAchPercentage}%</div>
+              <div className="absolute bottom-0 left-0 w-full h-2 bg-gradient-to-r from-white/10 via-pink-300/20 to-transparent rounded-b-lg" />
             </CardContent>
           </Card>
+
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Pie Chart */}
-          <Card className="col-span-1">
-            <CardContent className="p-4">
-              <h2 className="text-lg font-medium mb-4">Persentase Progress MTD</h2>
-              <div className="h-[300px] w-full">
-                <canvas ref={pieChartRef} />
-              </div>
-            </CardContent>
-          </Card>
+            <Card className="col-span-1 relative overflow-hidden bg-gradient-to-br from-red-50 via-red-100 to-white shadow-lg border-0">
+              {/* Decorative gradient blob */}
+
+              <CardContent className="p-4 relative z-10">
+                <h2 className="text-lg font-semibold mb-4 text-black flex items-center gap-2">
+                Persentase Progress MTD
+                </h2>
+                <div className="h-[260px] w-full flex items-center justify-center relative">
+                <canvas ref={pieChartRef} className="z-10" />
+                </div>
+              </CardContent>
+            </Card>
 
           {/* Bar Chart */}
           <Card className="col-span-2">
