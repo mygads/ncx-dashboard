@@ -31,3 +31,31 @@ export type ProgressType = {
   "PENDING BASO": number
   "PENDING BILLING APROVAL": number
 }
+
+
+// New types for revenue data
+export interface RevenueData {
+  periode: string
+  jenisPenjualan: string
+  wilayah: string
+  satuan: string
+  nilai: string
+  cumulative: string
+  achieve: string
+  growth: string
+}
+
+export interface RevenueChartData {
+  month: string
+  value: number
+  cumulative: number
+  achieve: number
+  growth: number
+}
+
+export interface RevenueSummary {
+  totalSmes: string
+  totalSustain: string
+  totalScaling: string
+  totalNGTMA: string
+}

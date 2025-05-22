@@ -184,6 +184,30 @@ async function FetchHotdaData() {
   }));
 }
 
+// Fungsi untuk fetch data insight dan summary dari sheet Update Text (Looket Studio)
+async function fetchUpdateTextSummary() {
+  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
+  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
+  const sheetName = 'Update Text (Looker Studio)';
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!json.values || json.values.length < 1) return { achLastMonth: '-', totalOrdersYTD: '-' };
+  const headers = json.values[0];
+  // Ambil isi kolom setelah header (header + 1)
+  const achLastMonthIdx = headers.findIndex((h: string) => h.toLowerCase().includes('ach last month'));
+  const totalOrdersIdx = headers.findIndex((h: string) => h.toLowerCase().includes('total orders'));
+  let achLastMonth = '-';
+  let totalOrdersYTD = '-';
+  if (achLastMonthIdx !== -1 && headers[achLastMonthIdx + 1]) {
+    achLastMonth = headers[achLastMonthIdx + 1];
+  }
+  if (totalOrdersIdx !== -1 && headers[totalOrdersIdx + 1]) {
+    totalOrdersYTD = headers[totalOrdersIdx + 1];
+  }
+  return { achLastMonth, totalOrdersYTD };
+}
+
 export default function AnalyticsDashboard() {
   const pieChartRef = useRef<HTMLCanvasElement>(null)
   const barChartRef = useRef<HTMLCanvasElement>(null)
@@ -208,6 +232,7 @@ export default function AnalyticsDashboard() {
   });
   const [ytdProgress, setYtdProgress] = useState<{ monthlyData: any[]; ordersCompleteYTD: string; achLastMonth: string }>({ monthlyData: [], ordersCompleteYTD: '-', achLastMonth: '-' });
   const [hotdaData, setHotdaData] = useState<{ location: string; count: number }[]>([]);
+  const [updateTextSummary, setUpdateTextSummary] = useState<{ achLastMonth: string; totalOrdersYTD: string }>({ achLastMonth: '-', totalOrdersYTD: '-' });
 
   // Fetch data dari Google Sheets saat mount
   useEffect(() => {
@@ -219,6 +244,7 @@ export default function AnalyticsDashboard() {
       })
     );
     FetchHotdaData().then(setHotdaData);
+    fetchUpdateTextSummary().then(setUpdateTextSummary);
   }, []);
 
   // Build data object using unitSummary
@@ -230,8 +256,8 @@ export default function AnalyticsDashboard() {
     totalComplete: unitSummary.totalComplete,
     totalFailed: unitSummary.totalFailed,
     overallAchPercentage: unitSummary.overallAchPercentage,
-    ordersCompleteYTD: ytdProgress.ordersCompleteYTD,
-    achLastMonth: ytdProgress.achLastMonth,
+    ordersCompleteYTD: updateTextSummary.totalOrdersYTD,
+    achLastMonth: updateTextSummary.achLastMonth,
     progressData: [
       { status: "PENDING BASO", percentage: Number(unitSummary.totalOrders) ? (Number(unitSummary.pendingBaso) / Number(unitSummary.totalOrders)) * 100 : 0, color: "#4169E1" },
       { status: "IN PROGRESS", percentage: Number(unitSummary.totalOrders) ? (Number(unitSummary.inProgress) / Number(unitSummary.totalOrders)) * 100 : 0, color: "#FFA500" },
