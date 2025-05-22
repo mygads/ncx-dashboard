@@ -30,36 +30,36 @@ type ProgressType = {
 };
 
 // Fungsi untuk fetch data dari Google Sheets
-async function fetchProgressData(): Promise<ProgressType> {
-  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
-  const sheetName = 'MTDProgress NCX';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.values || json.values.length < 2) return {
-    COMPLETE: "-",
-    "IN PROGRESS": "-",
-    "PENDING BASO": "-",
-    "PENDING BILLING APROVAL": "-",
-  };
-  const rows: [string, string][] = json.values.slice(1); // skip header
-  const result: ProgressType = {
-    COMPLETE: '-',
-    "IN PROGRESS": '-',
-    "PENDING BASO": '-',
-    "PENDING BILLING APROVAL": '-',
-  };
-  rows.forEach(([status, count]) => {
-    const key = status.trim().toUpperCase() as keyof ProgressType;
-    if (result.hasOwnProperty(key)) {
-      result[key] = Number(count);
-    }
-  });
-  return result;
-}
+// async function fetchProgressData(): Promise<ProgressType> {
+//   const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
+//   const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
+//   const sheetName = 'MTDProgress NCX';
+//   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
+//   const res = await fetch(url);
+//   const json = await res.json();
+//   if (!json.values || json.values.length < 2) return {
+//     COMPLETE: "-",
+//     "IN PROGRESS": "-",
+//     "PENDING BASO": "-",
+//     "PENDING BILLING APROVAL": "-",
+//   };
+//   const rows: [string, string][] = json.values.slice(1); // skip header
+//   const result: ProgressType = {
+//     COMPLETE: '-',
+//     "IN PROGRESS": '-',
+//     "PENDING BASO": '-',
+//     "PENDING BILLING APROVAL": '-',
+//   };
+//   rows.forEach(([status, count]) => {
+//     const key = status.trim().toUpperCase() as keyof ProgressType;
+//     if (result.hasOwnProperty(key)) {
+//       result[key] = Number(count);
+//     }
+//   });
+//   return result;
+// }
 
-// Fungsi untuk fetch data dari sheet UNIT NCX
+// Fungsi untuk fetch data summary dari sheet UNIT NCX
 async function fetchUnitSummary() {
   const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
   const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
@@ -67,14 +67,32 @@ async function fetchUnitSummary() {
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
   const res = await fetch(url);
   const json = await res.json();
-  if (!json.values || json.values.length < 2) return { totalFailed: '-', overallAchPercentage: '-' };
+  if (!json.values || json.values.length < 2) return {
+    totalOrders: '-',
+    totalFailed: '-',
+    inProgress: '-',
+    pendingBaso: '-',
+    pendingBillingApproval: '-',
+    totalComplete: '-',
+    overallAchPercentage: '-',
+  };
   const rows = json.values.slice(1); // skip header
+  let totalOrders = 0;
   let totalFailed = 0;
+  let inProgress = 0;
+  let pendingBaso = 0;
+  let pendingBillingApproval = 0;
+  let totalComplete = 0;
   let achSum = 0;
   let achCount = 0;
   rows.forEach((cols: string[]) => {
-    // Failed di kolom ke-2, % ACH di kolom ke-12
-    const failed = Number(cols[2]) || 0;
+    // Kolom: Total(1), Failed(2), In Progress Total(6), Pending BASO(7), Pending Bill Approval(9), Complete(10), % ACH(12)
+    totalOrders += Number(cols[1]) || 0;
+    totalFailed += Number(cols[2]) || 0;
+    inProgress += Number(cols[6]) || 0;
+    pendingBaso += Number(cols[7]) || 0;
+    pendingBillingApproval += Number(cols[9]) || 0;
+    totalComplete += Number(cols[10]) || 0;
     let ach = cols[12] || "0";
     ach = ach.replace(/%/g, "");
     const achNum = Number(ach);
@@ -82,10 +100,14 @@ async function fetchUnitSummary() {
       achSum += achNum;
       achCount++;
     }
-    totalFailed += failed;
   });
   return {
+    totalOrders: totalOrders.toString(),
     totalFailed: totalFailed.toString(),
+    inProgress: inProgress.toString(),
+    pendingBaso: pendingBaso.toString(),
+    pendingBillingApproval: pendingBillingApproval.toString(),
+    totalComplete: totalComplete.toString(),
     overallAchPercentage: achCount > 0 ? (achSum / achCount).toFixed(2) : '-',
   };
 }
@@ -104,20 +126,37 @@ async function fetchYTDProgress() {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1; // 1-based
-  // Filter hanya 12 bulan di tahun ini
+  // Filter hanya bulan di tahun ini dan <= bulan sekarang
   const filteredRows = rows.filter((cols: string[]) => {
     const [year, month] = (cols[0] || '').split('-');
-    return Number(year) === currentYear && Number(month) >= 1 && Number(month) <= 12;
-  }).slice(0, 12);
+    return Number(year) === currentYear && Number(month) >= 1 && Number(month) <= currentMonth;
+  });
+  // Penjumlahan YTD hanya bulan yang totalOrders > 0 DAN bulan <= bulan sekarang
   let ordersCompleteYTD = 0;
+  filteredRows.forEach((cols: string[]) => {
+    let totalOrders = Number(cols[1]);
+    // Hanya jumlahkan bulan yang totalOrders > 0 DAN bulan <= bulan sekarang
+    const [year, month] = (cols[0] || '').split('-');
+    if (!isNaN(totalOrders) && totalOrders > 0 && Number(month) <= currentMonth) {
+      ordersCompleteYTD += totalOrders;
+    }
+  });
+  // Ach last month: ambil % ach pada bulan sebelum bulan sekarang, tidak peduli totalOrders
   let achLastMonth = 0;
+  const lastMonthRow = filteredRows.find((cols: string[]) => {
+    const [year, month] = (cols[0] || '').split('-');
+    return Number(month) === currentMonth - 1;
+  });
+  if (lastMonthRow) {
+    let ach = Number(lastMonthRow[2]);
+    achLastMonth = isNaN(ach) ? 0 : ach;
+  }
   const monthlyData = filteredRows.map((cols: string[], idx: number) => {
     const month = cols[0] || "";
     let totalOrders = Number(cols[1]);
     let achPercentage = Number(cols[2]);
     if (isNaN(totalOrders)) totalOrders = 0;
     if (isNaN(achPercentage)) achPercentage = 0;
-    ordersCompleteYTD += totalOrders;
     // Ambil Ach Last Month (bulan sebelumnya dari bulan sekarang)
     const [year, monthNum] = month.split("-");
     if (Number(monthNum) === currentMonth - 1) {
@@ -158,13 +197,20 @@ export default function AnalyticsDashboard() {
     "PENDING BILLING APROVAL": '-',
   });
 
-  const [unitSummary, setUnitSummary] = useState<{ totalFailed: string; overallAchPercentage: string | number }>({ totalFailed: '-', overallAchPercentage: '-' });
+  const [unitSummary, setUnitSummary] = useState({
+    totalOrders: '-',
+    totalFailed: '-',
+    inProgress: '-',
+    pendingBaso: '-',
+    pendingBillingApproval: '-',
+    totalComplete: '-',
+    overallAchPercentage: '-',
+  });
   const [ytdProgress, setYtdProgress] = useState<{ monthlyData: any[]; ordersCompleteYTD: string; achLastMonth: string }>({ monthlyData: [], ordersCompleteYTD: '-', achLastMonth: '-' });
   const [hotdaData, setHotdaData] = useState<{ location: string; count: number }[]>([]);
 
   // Fetch data dari Google Sheets saat mount
   useEffect(() => {
-    fetchProgressData().then(setProgress);
     fetchUnitSummary().then(setUnitSummary);
     fetchYTDProgress().then((result) =>
       setYtdProgress({
@@ -175,25 +221,22 @@ export default function AnalyticsDashboard() {
     FetchHotdaData().then(setHotdaData);
   }, []);
 
-  // Build data object using progress
-  const totalOrders = Number(progress.COMPLETE) + Number(progress["IN PROGRESS"]) + Number(progress["PENDING BASO"]) + Number(progress["PENDING BILLING APROVAL"]);
+  // Build data object using unitSummary
   const data = {
-    totalOrders,
-    inProgress: progress["IN PROGRESS"],
-    pendingBaso: progress["PENDING BASO"],
-    pendingBillingApproval: progress["PENDING BILLING APROVAL"],
-    totalComplete: progress.COMPLETE,
+    totalOrders: unitSummary.totalOrders,
+    inProgress: unitSummary.inProgress,
+    pendingBaso: unitSummary.pendingBaso,
+    pendingBillingApproval: unitSummary.pendingBillingApproval,
+    totalComplete: unitSummary.totalComplete,
     totalFailed: unitSummary.totalFailed,
-    overallAchPercentage: typeof unitSummary.overallAchPercentage === "number"
-      ? unitSummary.overallAchPercentage.toFixed(2)
-      : unitSummary.overallAchPercentage,
+    overallAchPercentage: unitSummary.overallAchPercentage,
     ordersCompleteYTD: ytdProgress.ordersCompleteYTD,
     achLastMonth: ytdProgress.achLastMonth,
     progressData: [
-      { status: "PENDING BASO", percentage: totalOrders ? (Number(progress["PENDING BASO"]) / totalOrders) * 100 : 0, color: "#4169E1" },
-      { status: "IN PROGRESS", percentage: totalOrders ? (Number(progress["IN PROGRESS"]) / totalOrders) * 100 : 0, color: "#FFA500" },
-      { status: "COMPLETE", percentage: totalOrders ? (Number(progress.COMPLETE) / totalOrders) * 100 : 0, color: "#32CD32" },
-      { status: "PENDING BILLING APROVAL", percentage: totalOrders ? (Number(progress["PENDING BILLING APROVAL"]) / totalOrders) * 100 : 0, color: "#DC3545" },
+      { status: "PENDING BASO", percentage: Number(unitSummary.totalOrders) ? (Number(unitSummary.pendingBaso) / Number(unitSummary.totalOrders)) * 100 : 0, color: "#4169E1" },
+      { status: "IN PROGRESS", percentage: Number(unitSummary.totalOrders) ? (Number(unitSummary.inProgress) / Number(unitSummary.totalOrders)) * 100 : 0, color: "#FFA500" },
+      { status: "COMPLETE", percentage: Number(unitSummary.totalOrders) ? (Number(unitSummary.totalComplete) / Number(unitSummary.totalOrders)) * 100 : 0, color: "#32CD32" },
+      { status: "PENDING BILLING APROVAL", percentage: Number(unitSummary.totalOrders) ? (Number(unitSummary.pendingBillingApproval) / Number(unitSummary.totalOrders)) * 100 : 0, color: "#DC3545" },
     ],
     monthlyData: ytdProgress.monthlyData.length ? ytdProgress.monthlyData : [],
     hotdaData: [hotdaData.length ? hotdaData : []],

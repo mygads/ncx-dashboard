@@ -31,7 +31,7 @@ async function fetchImputerData() {
     const name = cols[0] || "";
     const total = Number(cols[1]) || 0;
     const failed = Number(cols[2]) || 0;
-    const complete = Number(cols[9]) || 0;
+    const complete = Number(cols[10]) || 0;
     let ach = cols[12] || "0";
     ach = ach.replace(/%/g, "");
     const achPercentage = Number(ach) || 0;
@@ -217,7 +217,7 @@ export default function ImputerPerformancePage() {
                     }}
                     className="mr-2"
                   />
-                  <span>Imputer ({selectedImputers.length})</span>
+                  <span>Inputer ({selectedImputers.length})</span>
                 </div>
                 <span>Total</span>
               </div>

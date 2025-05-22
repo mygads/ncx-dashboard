@@ -39,7 +39,7 @@ async function fetchAMData() {
     const name = cols[0] || "";
     const total = Number(cols[1]) || 0;
     const failed = Number(cols[2]) || 0;
-    const complete = Number(cols[9]) || 0;
+    const complete = Number(cols[10]) || 0;
     let ach = cols[12] || "0";
     ach = ach.replace(/%/g, "");
     const achPercentage = Number(ach) || 0;

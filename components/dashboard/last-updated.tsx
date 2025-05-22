@@ -11,18 +11,18 @@ export function useLastUpdated() {
     useEffect(() => {
         let cancelled = false;
         async function fetchLastUpdated() {
-        try {
-            const url = `https://www.googleapis.com/drive/v3/files/${SPREADSHEET_ID}?fields=modifiedTime&key=${API_KEY}`;
-            const res = await fetch(url);
-            const json = await res.json();
-            if (!cancelled && json?.modifiedTime) {
-            setLastUpdated(new Date(json.modifiedTime));
+            try {
+                const url = `https://www.googleapis.com/drive/v3/files/${SPREADSHEET_ID}?fields=modifiedTime&key=${API_KEY}`;
+                const res = await fetch(url);
+                const json = await res.json();
+                if (!cancelled && json?.modifiedTime) {
+                setLastUpdated(new Date(json.modifiedTime));
+                }
+            } catch (e) {
+                if (!cancelled) {
+                setLastUpdated(null);
+                }
             }
-        } catch (e) {
-            if (!cancelled) {
-            setLastUpdated(null);
-            }
-        }
         }
         fetchLastUpdated();
         return () => { cancelled = true }

@@ -31,7 +31,7 @@ async function fetchUnitData() {
     const name = cols[0] || "";
     const total = Number(cols[1]) || 0;
     const failed = Number(cols[2]) || 0;
-    const complete = Number(cols[9]) || 0;
+    const complete = Number(cols[10]) || 0;
     let ach = cols[12] || "0";
     ach = ach.replace(/%/g, "");
     const achPercentage = Number(ach) || 0;
@@ -133,7 +133,10 @@ export default function UnitSegmentPage() {
   }))
 
   // Data for Complete (Pie)
-  const totalCompletionsAll = sortedSelectedUnitsData.reduce((sum, unit) => sum + unit.complete, 0)
+  // Hitung total complete dari semua unit yang terpilih
+  const totalCompletionsAll = sortedSelectedUnitsData.reduce((sum, unit) => sum + unit.complete, 0);
+
+  // Data untuk Pie Chart: persentase complete per unit dibanding total complete semua unit terpilih
   const pieChartData = sortedSelectedUnitsData.map((unit, i) => ({
     status: unit.name,
     percentage: totalCompletionsAll > 0 ? (unit.complete / totalCompletionsAll) * 100 : 0,
