@@ -20,6 +20,7 @@ import {
   ChevronRight,
   LogOut,
   ChevronLeft,
+  Lock,
 } from "lucide-react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
@@ -30,21 +31,25 @@ const topRoutes = [
     label: "Home",
     icon: Home,
     href: "/dashboard/home",
+    requiresDataSource: false, // Home is always accessible
   },
   {
     label: "Revenue",
     icon: LineChart,
     href: "/dashboard/revenue",
+    requiresDataSource: true,
   },
   {
     label: "Sales Operation",
     icon: BarChart3,
     href: "/dashboard/sales",
+    requiresDataSource: true,
   },
   {
     label: "Digital Product",
     icon: Store,
     href: "/dashboard/products",
+    requiresDataSource: true,
   },
 ]
 
@@ -53,36 +58,43 @@ const middleRoutes = [
     label: "Dashboard",
     icon: LayoutDashboard,
     href: "/dashboard/analytics",
+    requiresDataSource: true,
   },
   {
     label: "Unit Segment",
     icon: Calendar,
     href: "/dashboard/segments",
+    requiresDataSource: true,
   },
   {
     label: "Inputer Performance",
     icon: Calendar,
     href: "/dashboard/inputer",
+    requiresDataSource: true,
   },
   {
     label: "AM Performance",
     icon: Calendar,
     href: "/dashboard/am-performance",
+    requiresDataSource: true,
   },
   {
     label: "Tipe Order Detail",
     icon: Calendar,
     href: "/dashboard/order-types",
+    requiresDataSource: true,
   },
   {
     label: "Branch Detail",
     icon: Calendar,
     href: "/dashboard/branches",
+    requiresDataSource: true,
   },
   {
     label: "Umur Order Detail",
     icon: Calendar,
     href: "/dashboard/order-age",
+    requiresDataSource: true,
   },
 ]
 
@@ -111,6 +123,16 @@ interface SidebarProps {
   onCollapseChange?: (collapsed: boolean) => void
 }
 
+interface DataSource {
+  id: string
+  type: 'spreadsheet' | 'file'
+  name: string
+  url?: string
+  filename?: string
+  uploadedAt: string
+  userId: string
+}
+
 export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChange }: SidebarProps) {
   const pathname = usePathname() || ""
   const { signOut, user } = useAuth()
@@ -120,6 +142,8 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
   const [fullName, setFullName] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [targetAMItems, setTargetAMItems] = useState<{ label: string; href: string }[]>([]);
+  const [hasDataSource, setHasDataSource] = useState(false)
+  const [currentDataSource, setCurrentDataSource] = useState<DataSource | null>(null)
   const router = useRouter()
 
   // Sync local state with prop
@@ -149,11 +173,54 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
     fetchUserInfo()
   }, [user])
 
+  // Check for data source
+  useEffect(() => {
+    async function checkDataSource() {
+      if (!user) {
+        setHasDataSource(false)
+        setCurrentDataSource(null)
+        return
+      }
+
+      const supabase = createClientComponentClient()
+      const { data, error } = await supabase
+        .from('data_sources')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('uploaded_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (data && !error) {
+        setHasDataSource(true)
+        setCurrentDataSource(data)
+      } else {
+        setHasDataSource(false)
+        setCurrentDataSource(null)
+      }
+    }
+
+    checkDataSource()
+  }, [user])
+
   // Fetch Target AM data from spreadsheet
   useEffect(() => {
     async function fetchTargetAMData() {
+      if (!hasDataSource || !currentDataSource) return
+
       try {
-        const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
+        let spreadsheetId: string | undefined
+
+        if (currentDataSource.type === 'spreadsheet') {
+          spreadsheetId = currentDataSource.url
+        } else {
+          // For file uploads, we might need a different approach
+          // For now, skip Target AM data fetching for file uploads
+          return
+        }
+
+        if (!spreadsheetId) return
+
         const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
         const sheetName = 'DataAutoGSlide';
         const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
@@ -185,7 +252,7 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
       }
     }
     fetchTargetAMData();
-  }, []);
+  }, [hasDataSource, currentDataSource]);
 
   const toggleCollapse = () => {
     const newCollapsed = !collapsed
@@ -240,20 +307,46 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
       <div className="flex-1 overflow-y-auto">
         {/* Top Routes */}
         <div className="py-2">
-          {topRoutes.map((route) => (
-            <Link
-              key={route.href}
-              href={route.href}
-              className={cn(
-                "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition",
-                pathname === route.href ? "bg-gray-100 text-black" : "text-gray-600 hover:bg-gray-100",
-              )}
-              onClick={onItemClick}
-            >
-              <route.icon className={cn("h-5 w-5 min-w-5", iconColorMap[route.label])} />
-              {!collapsed && <span className="ml-3">{route.label}</span>}
-            </Link>
-          ))}
+          {topRoutes.map((route) => {
+            const isLocked = route.requiresDataSource && !hasDataSource
+            
+            if (isLocked) {
+              return (
+                <div
+                  key={route.href}
+                  className={cn(
+                    "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition relative",
+                    "text-gray-400 cursor-not-allowed"
+                  )}
+                >
+                  <route.icon className="h-5 w-5 min-w-5 text-gray-400" />
+                  {!collapsed && (
+                    <>
+                      <span className="ml-3">{route.label}</span>
+                      <Lock className="h-3 w-3 ml-auto text-gray-400" />
+                    </>
+                  )}
+                </div>
+              )
+            }
+            
+            return (
+              <Link
+                key={route.href}
+                href={route.href}
+                className={cn(
+                  "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition",
+                  pathname === route.href 
+                    ? "bg-gray-100 text-black" 
+                    : "text-gray-600 hover:bg-gray-100",
+                )}
+                onClick={onItemClick}
+              >
+                <route.icon className={cn("h-5 w-5 min-w-5", iconColorMap[route.label])} />
+                {!collapsed && <span className="ml-3">{route.label}</span>}
+              </Link>
+            )
+          })}
         </div>
 
         {/* Divider with text */}
@@ -270,36 +363,74 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
 
         {/* Middle Routes */}
         <div className="py-2">
-          {middleRoutes.map((route) => (
-            <Link
-              key={route.href}
-              href={route.href}
-              className={cn(
-                "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition",
-                pathname === route.href || (route.href === "/dashboard/analytics" && pathname === "/dashboard")
-                  ? "bg-gray-100 text-black"
-                  : "text-gray-600 hover:bg-gray-100",
-              )}
-              onClick={onItemClick}
-            >
-              <route.icon className={cn("h-5 w-5 min-w-5", iconColorMap[route.label])} />
-              {!collapsed && <span className="ml-3">{route.label}</span>}
-            </Link>
-          ))}
+          {middleRoutes.map((route) => {
+            const isLocked = route.requiresDataSource && !hasDataSource
+            
+            if (isLocked) {
+              return (
+                <div
+                  key={route.href}
+                  className={cn(
+                    "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition relative",
+                    "text-gray-400 cursor-not-allowed"
+                  )}
+                >
+                  <route.icon className="h-5 w-5 min-w-5 text-gray-400" />
+                  {!collapsed && (
+                    <>
+                      <span className="ml-3">{route.label}</span>
+                      <Lock className="h-3 w-3 ml-auto text-gray-400" />
+                    </>
+                  )}
+                </div>
+              )
+            }
+            
+            return (
+              <Link
+                key={route.href}
+                href={route.href}
+                className={cn(
+                  "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition",
+                  pathname === route.href || (route.href === "/dashboard/analytics" && pathname === "/dashboard")
+                    ? "bg-gray-100 text-black"
+                    : "text-gray-600 hover:bg-gray-100",
+                )}
+                onClick={onItemClick}
+              >
+                <route.icon className={cn("h-5 w-5 min-w-5", iconColorMap[route.label])} />
+                {!collapsed && <span className="ml-3">{route.label}</span>}
+              </Link>
+            )
+          })}
         </div>
 
         {/* Target AM Section */}
         <div className="py-2">
           <button
-            onClick={() => setTargetAMExpanded(!targetAMExpanded)}
-            className="w-full flex items-center px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
+            onClick={() => hasDataSource && setTargetAMExpanded(!targetAMExpanded)}
+            className={cn(
+              "w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition",
+              hasDataSource 
+                ? "text-gray-600 hover:bg-gray-100" 
+                : "text-gray-400 cursor-not-allowed"
+            )}
+            disabled={!hasDataSource}
           >
             {!collapsed &&
               (targetAMExpanded ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronRight className="h-4 w-4 mr-1" />)}
-            <Target className={cn("h-5 w-5 min-w-5", iconColorMap["Target AM"])} />
-            {!collapsed && <span className="ml-3">Target AM</span>}
+            <Target className={cn(
+              "h-5 w-5 min-w-5", 
+              hasDataSource ? iconColorMap["Target AM"] : "text-gray-400"
+            )} />
+            {!collapsed && (
+              <>
+                <span className="ml-3">Target AM</span>
+                {!hasDataSource && <Lock className="h-3 w-3 ml-auto text-gray-400" />}
+              </>
+            )}
           </button>
-          {!collapsed && targetAMExpanded && (
+          {!collapsed && targetAMExpanded && hasDataSource && (
             <div className="pl-12 mt-1 flex flex-col gap-1 border-l-2 border-amber-200">
               {targetAMItems.length === 0 ? (
                 <div className="text-sm text-gray-500 py-2">Loading...</div>
@@ -331,8 +462,14 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
         {/* Target DATEL Section */}
         <div className="py-2">
           <button
-            onClick={() => setTargetDATELExpanded(!targetDATELExpanded)}
-            className="w-full flex items-center px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
+            onClick={() => hasDataSource && setTargetDATELExpanded(!targetDATELExpanded)}
+            className={cn(
+              "w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition",
+              hasDataSource 
+                ? "text-gray-600 hover:bg-gray-100" 
+                : "text-gray-400 cursor-not-allowed"
+            )}
+            disabled={!hasDataSource}
           >
             {!collapsed &&
               (targetDATELExpanded ? (
@@ -340,11 +477,19 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
               ) : (
                 <ChevronRight className="h-4 w-4 mr-1" />
               ))}
-            <Target className={cn("h-5 w-5 min-w-5", iconColorMap["Target DATEL"])} />
-            {!collapsed && <span className="ml-3">Target DATEL</span>}
+            <Target className={cn(
+              "h-5 w-5 min-w-5", 
+              hasDataSource ? iconColorMap["Target DATEL"] : "text-gray-400"
+            )} />
+            {!collapsed && (
+              <>
+                <span className="ml-3">Target DATEL</span>
+                {!hasDataSource && <Lock className="h-3 w-3 ml-auto text-gray-400" />}
+              </>
+            )}
           </button>
 
-          {!collapsed && targetDATELExpanded && (
+          {!collapsed && targetDATELExpanded && hasDataSource && (
             <div className="pl-12">
               {targetDATELItems.map((item) => (
                 <Link

@@ -1,8 +1,496 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { 
+  FileSpreadsheet, 
+  Upload, 
+  Link2, 
+  Trash2, 
+  Check, 
+  AlertCircle,
+  Calendar,
+  FileText
+} from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/lib/auth-context"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+
+interface DataSource {
+  id: string
+  type: 'spreadsheet' | 'file'
+  name: string
+  url?: string
+  filename?: string
+  uploadedAt: string
+  userId: string
+}
+
 export default function DashboardHome() {
+  const [activeTab, setActiveTab] = useState("select")
+  const [spreadsheetUrl, setSpreadsheetUrl] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [currentDataSource, setCurrentDataSource] = useState<DataSource | null>(null)
+  const { toast } = useToast()
+  const { user } = useAuth()
+
+  // Load current data source on component mount
+  useEffect(() => {
+    loadCurrentDataSource()
+  }, [user])
+
+  const loadCurrentDataSource = async () => {
+    if (!user) return
+
+    const supabase = createClientComponentClient()
+    const { data, error } = await supabase
+      .from('data_sources')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('uploaded_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (data && !error) {
+      setCurrentDataSource({
+        id: data.id,
+        type: data.type,
+        name: data.name,
+        url: data.url,
+        filename: data.filename,
+        uploadedAt: data.uploaded_at,
+        userId: data.user_id
+      })
+      setActiveTab("manage")
+    }
+  }
+
+  const extractSpreadsheetId = (url: string): string | null => {
+    // Extract ID from various Google Sheets URL formats
+    const patterns = [
+      /\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/,
+      /spreadsheets\/d\/([a-zA-Z0-9-_]+)/,
+      /^([a-zA-Z0-9-_]+)$/
+    ]
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern)
+      if (match) {
+        return match[1]
+      }
+    }
+    return null
+  }
+
+  const handleSpreadsheetSubmit = async () => {
+    if (!spreadsheetUrl.trim()) {
+      toast({
+        title: "Error",
+        description: "Masukkan URL Google Spreadsheet",
+        variant: "destructive"
+      })
+      return
+    }
+
+    const spreadsheetId = extractSpreadsheetId(spreadsheetUrl)
+    if (!spreadsheetId) {
+      toast({
+        title: "Error",
+        description: "URL Google Spreadsheet tidak valid",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      // Verify spreadsheet access
+      const response = await fetch(`/api/verify-spreadsheet?id=${spreadsheetId}`)
+      if (!response.ok) {
+        throw new Error("Spreadsheet tidak dapat diakses atau tidak ditemukan")
+      }
+
+      const supabase = createClientComponentClient()
+      
+      // Delete existing data source
+      await supabase
+        .from('data_sources')
+        .delete()
+        .eq('user_id', user?.id)
+
+      // Save new data source
+      const { data, error } = await supabase
+        .from('data_sources')
+        .insert({
+          user_id: user?.id,
+          type: 'spreadsheet',
+          name: `Google Spreadsheet`,
+          url: spreadsheetId,
+          uploaded_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setCurrentDataSource(data)
+      setActiveTab("manage")
+      setSpreadsheetUrl("")
+
+      toast({
+        title: "Berhasil",
+        description: "Google Spreadsheet berhasil dihubungkan"
+      })
+
+      // Trigger a page refresh to update sidebar state after a short delay
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+
+    } catch (error) {
+      console.error("Error connecting spreadsheet:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Gagal menghubungkan spreadsheet",
+        variant: "destructive"
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleFileUpload = async () => {
+    if (!uploadFile) {
+      toast({
+        title: "Error",
+        description: "Pilih file Excel atau CSV",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Validate file type
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv'
+    ]
+
+    if (!allowedTypes.includes(uploadFile.type)) {
+      toast({
+        title: "Error",
+        description: "Format file tidak didukung. Gunakan Excel (.xlsx, .xls) atau CSV",
+        variant: "destructive"
+      })
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', uploadFile)
+      formData.append('userId', user?.id || '')
+
+      const response = await fetch('/api/upload-file', {
+        method: 'POST',
+        body: formData
+      })
+
+      if (!response.ok) {
+        throw new Error('Gagal mengupload file')
+      }
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || 'Gagal mengupload file')
+      }
+
+      // Update current data source from API response
+      setCurrentDataSource(result.dataSource)
+      setActiveTab("manage")
+      setUploadFile(null)
+
+      toast({
+        title: "Berhasil",
+        description: "File berhasil diupload"
+      })
+
+      // Trigger a page refresh to update sidebar state after a short delay
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+
+    } catch (error) {
+      console.error("Error uploading file:", error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Gagal mengupload file",
+        variant: "destructive"
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDeleteDataSource = async () => {
+    if (!currentDataSource) return
+
+    setIsLoading(true)
+
+    try {
+      const supabase = createClientComponentClient()
+
+      // Delete from database
+      const { error } = await supabase
+        .from('data_sources')
+        .delete()
+        .eq('id', currentDataSource.id)
+
+      if (error) throw error
+
+      // If it's a file, delete the physical file
+      if (currentDataSource.type === 'file' && currentDataSource.filename) {
+        await fetch('/api/delete-file', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: currentDataSource.filename })
+        })
+      }
+
+      setCurrentDataSource(null)
+      setActiveTab("select")
+
+      toast({
+        title: "Berhasil",
+        description: "Sumber data berhasil dihapus"
+      })
+
+      // Refresh page to update sidebar
+      setTimeout(() => {
+        window.location.reload()
+      }, 1000)
+
+    } catch (error) {
+      console.error("Error deleting data source:", error)
+      toast({
+        title: "Error",
+        description: "Gagal menghapus sumber data",
+        variant: "destructive"
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (!user) {
     return (
-        <div className="flex flex-col items-center justify-center h-screen">
-        <h1 className="text-2xl font-bold">Welcome to the Dashboard</h1>
-        <p className="mt-4 text-gray-600">This is the home page of the dashboard.</p>
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-lg font-semibold">Akses Ditolak</h2>
+          <p className="text-muted-foreground">Silakan login untuk mengakses dashboard</p>
         </div>
+      </div>
     )
+  }
+
+  return (
+    <div className="container mx-auto p-6 max-w-4xl">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">Dashboard Home</h1>
+        <p className="text-muted-foreground mt-2">
+          Kelola sumber data untuk dashboard analytics Anda
+        </p>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="select" disabled={currentDataSource !== null}>
+            Pilih Sumber Data
+          </TabsTrigger>
+          <TabsTrigger value="manage" disabled={currentDataSource === null}>
+            Kelola Data
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="select" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5" />
+                Pilih Sumber Data
+              </CardTitle>
+              <CardDescription>
+                Pilih sumber data yang akan digunakan untuk dashboard analytics
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="spreadsheet" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="spreadsheet" className="flex items-center gap-2">
+                    <Link2 className="h-4 w-4" />
+                    Google Spreadsheet
+                  </TabsTrigger>
+                  <TabsTrigger value="upload" className="flex items-center gap-2">
+                    <Upload className="h-4 w-4" />
+                    Upload File
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="spreadsheet" className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="spreadsheet-url">URL Google Spreadsheet</Label>
+                    <Input
+                      id="spreadsheet-url"
+                      placeholder="https://docs.google.com/spreadsheets/d/..."
+                      value={spreadsheetUrl}
+                      onChange={(e) => setSpreadsheetUrl(e.target.value)}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Masukkan URL lengkap atau ID dari Google Spreadsheet
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={handleSpreadsheetSubmit} 
+                    disabled={isLoading}
+                    className="w-full"
+                  >
+                    {isLoading ? "Menghubungkan..." : "Hubungkan Spreadsheet"}
+                  </Button>
+                </TabsContent>
+
+                <TabsContent value="upload" className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="file-upload">Upload File Excel atau CSV</Label>
+                    <Input
+                      id="file-upload"
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Mendukung format: Excel (.xlsx, .xls) dan CSV (.csv)
+                    </p>
+                  </div>
+                  {uploadFile && (
+                    <Alert>
+                      <FileText className="h-4 w-4" />
+                      <AlertDescription>
+                        File dipilih: <strong>{uploadFile.name}</strong> ({(uploadFile.size / 1024 / 1024).toFixed(2)} MB)
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  <Button 
+                    onClick={handleFileUpload} 
+                    disabled={isLoading || !uploadFile}
+                    className="w-full"
+                  >
+                    {isLoading ? "Mengupload..." : "Upload File"}
+                  </Button>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="manage" className="space-y-6">
+          {currentDataSource && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  {currentDataSource.type === 'spreadsheet' ? (
+                    <Link2 className="h-5 w-5" />
+                  ) : (
+                    <FileText className="h-5 w-5" />
+                  )}
+                  Sumber Data Aktif
+                </CardTitle>
+                <CardDescription>
+                  Data source yang sedang digunakan untuk dashboard
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Badge variant="default">
+                    {currentDataSource.type === 'spreadsheet' ? 'Google Spreadsheet' : 'File Upload'}
+                  </Badge>
+                  <Badge variant="outline">
+                    <Check className="h-3 w-3 mr-1" />
+                    Aktif
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium">Nama</Label>
+                    <p className="text-sm text-muted-foreground">{currentDataSource.name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium">Tanggal Upload</Label>
+                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      {new Date(currentDataSource.uploadedAt).toLocaleDateString('id-ID', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                {currentDataSource.type === 'spreadsheet' && currentDataSource.url && (
+                  <div>
+                    <Label className="text-sm font-medium">Spreadsheet ID</Label>
+                    <p className="text-sm text-muted-foreground font-mono bg-muted p-2 rounded">
+                      {currentDataSource.url}
+                    </p>
+                  </div>
+                )}
+
+                {currentDataSource.type === 'file' && currentDataSource.filename && (
+                  <div>
+                    <Label className="text-sm font-medium">Nama File</Label>
+                    <p className="text-sm text-muted-foreground font-mono bg-muted p-2 rounded">
+                      {currentDataSource.filename}
+                    </p>
+                  </div>
+                )}
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Aksi</Label>
+                  <Button 
+                    variant="destructive" 
+                    onClick={handleDeleteDataSource}
+                    disabled={isLoading}
+                    className="w-full"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {isLoading ? "Menghapus..." : "Hapus Sumber Data"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Menghapus sumber data akan menghilangkan akses ke semua menu dashboard
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
 }
