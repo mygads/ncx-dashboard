@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import type { AMData, InsightData } from "@/lib/types"
+import type { InsightData } from "@/lib/types"
 import { Chart, registerables } from "chart.js"
 import { ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
@@ -15,18 +15,24 @@ import { ClonePieChart } from "@/components/dashboard/clone-pie-chart"
 import { CloneBarChart } from "@/components/dashboard/clone-bar-chart"
 import { CloneBarOnlyChart } from "@/components/dashboard/clone-baronly-chart"
 import { CloneInsightCard } from "@/components/dashboard/clone-insight-card"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { fetchDataFromSource } from "@/lib/data-source"
 Chart.register(...registerables)
 
-// Fungsi untuk fetch data Branch Detail dari Google Sheets
-async function fetchBranchDetailData() {
-  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
-  const sheetName = 'BRANCH NCX';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.values || json.values.length < 2) return [];
-  const rows = json.values.slice(1); // skip header
+// Interface untuk data Branch
+interface BranchData {
+  name: string
+  total: number
+  failed: number
+  complete: number
+  achPercentage: number
+}
+
+// Fungsi untuk fetch data Branch Detail dari sumber data yang dipilih user
+async function fetchBranchDetailData(userId: string) {
+  const result = await fetchDataFromSource(userId, 'BRANCH NCX');
+  if (!result.success || !result.data || result.data.length < 2) return [];
+  const rows = result.data.slice(1); // skip header
   return rows.map((cols: string[]) => {
     const name = cols[0] || "";
     const total = Number(cols[1]) || 0;
@@ -39,16 +45,11 @@ async function fetchBranchDetailData() {
   });
 }
 
-// Fungsi untuk fetch insight Branch Detail dari Google Sheets
-async function fetchInsightBranchDetail() {
-  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
-  const sheetName = 'Update Text (Looker Studio)';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.values || json.values.length < 1) return "";
-  const headers = json.values[0];
+// Fungsi untuk fetch insight Branch Detail dari sumber data yang dipilih user
+async function fetchInsightBranchDetail(userId: string) {
+  const result = await fetchDataFromSource(userId, 'Update Text (Looker Studio)');
+  if (!result.success || !result.data || result.data.length < 1) return "";
+  const headers = result.data[0];
   const idx = headers.findIndex((h: string) => h.toLowerCase().includes("insight branch"));
   if (idx === -1) return "";
   // Data insight ada di kolom ke-10 (idx + 1) pada baris header
@@ -57,11 +58,12 @@ async function fetchInsightBranchDetail() {
 
 export default function BranchDetailPage() {
   const [loading, setLoading] = useState(true)
-  const [branchData, setbranchData] = useState<any[]>([])
+  const [branchData, setbranchData] = useState<BranchData[]>([])
   const [insightOrder, setInsightBranchs] = useState("")
   const [selectedBranchs, setSelectedBranchs] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const supabase = createClientComponentClient()
 
   const barChartRef = useRef<HTMLCanvasElement>(null)
   const pieChartRef = useRef<HTMLCanvasElement>(null)
@@ -72,8 +74,15 @@ export default function BranchDetailPage() {
     const fetchData = async () => {
       setLoading(true)
       try {
+        // Get user ID first
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          console.error("User not authenticated")
+          return
+        }
+
         const [branchDataResult, insightBranchResult] = await Promise.all([
-          fetchBranchDetailData(), fetchInsightBranchDetail()
+          fetchBranchDetailData(user.id), fetchInsightBranchDetail(user.id)
         ])
         setbranchData(branchDataResult)
         setInsightBranchs(insightBranchResult || "")

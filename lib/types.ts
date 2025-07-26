@@ -55,7 +55,9 @@ export interface RevenueChartData {
 
 export interface RevenueSummary {
   totalSmes: string
-  totalSustain: string
-  totalScaling: string
+  totalOCA: string
+  totalNetmonk: string
+  totalAntares: string
+  totalPijar: string
   totalNGTMA: string
 }

@@ -8,6 +8,8 @@ import { useRouter, useParams } from "next/navigation"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { LastUpdatedFooter } from "@/components/dashboard/last-updated"
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { fetchDataFromSource } from "@/lib/data-source"
 
 // Tipe data untuk target AM
 interface TargetAMData {
@@ -35,24 +37,18 @@ interface TargetAMData {
   }
 }
 
-// Fungsi untuk fetch data dari spreadsheet
-async function fetchTargetAMData(slug?: string): Promise<TargetAMData[]> {
+// Fungsi untuk fetch data dari sumber data yang dipilih user
+async function fetchTargetAMData(userId: string, slug?: string): Promise<TargetAMData[]> {
   try {
-    const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID
-    const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY
-    const sheetName = "DataAutoGSlide"
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`
-
-    const res = await fetch(url)
-    const json = await res.json()
-
-    if (!json.values || json.values.length < 2) {
-      throw new Error("No data found in spreadsheet")
+    const dataResult = await fetchDataFromSource(userId, "DataAutoGSlide")
+    
+    if (!dataResult.success || !dataResult.data || dataResult.data.length < 2) {
+      throw new Error("No data found in data source")
     }
 
     // Mengambil header dan data
-    const headers = json.values[0]
-    const rows = json.values.slice(1)
+    const headers = dataResult.data[0]
+    const rows = dataResult.data.slice(1)
 
     // Mencari indeks kolom yang dibutuhkan
     const bagianSlideIndex = headers.findIndex((h: string) => h === "Bagian Slide")
@@ -60,7 +56,7 @@ async function fetchTargetAMData(slug?: string): Promise<TargetAMData[]> {
     const dataCleanIndex = headers.findIndex((h: string) => h === "Data Clean")
 
     if (bagianSlideIndex === -1 || labelIndex === -1 || dataCleanIndex === -1) {
-      throw new Error("Required columns not found in spreadsheet")
+      throw new Error("Required columns not found in data source")
     }
 
     // Mengelompokkan data berdasarkan AM
@@ -94,7 +90,7 @@ async function fetchTargetAMData(slug?: string): Promise<TargetAMData[]> {
     })
 
     // Mengubah data ke format yang dibutuhkan
-    const result: TargetAMData[] = []
+    const targetAMResult: TargetAMData[] = []
 
     amDataMap.forEach((dataMap, amName) => {
       const nikMatch = amName.match(/\/\s*(\d+)/)
@@ -107,7 +103,7 @@ async function fetchTargetAMData(slug?: string): Promise<TargetAMData[]> {
         return
       }
 
-      result.push({
+      targetAMResult.push({
         name,
         nik,
         revenue: {
@@ -133,7 +129,7 @@ async function fetchTargetAMData(slug?: string): Promise<TargetAMData[]> {
       })
     })
 
-    return result
+    return targetAMResult
   } catch (error) {
     console.error("Error fetching target AM data:", error)
     return []
@@ -149,25 +145,33 @@ function getAMPhotoUrl(name: string) {
   return `https://tgftiktwtqyqpcrofevj.supabase.co/storage/v1/object/public/profile/${encodedName}.png`;
 }
 
-export default function TargetAMPage() {
+export default function TargetAMDetailPage() {
   const [loading, setLoading] = useState(true)
   const [amList, setAmList] = useState<TargetAMData[]>([])
   const [selectedAM, setSelectedAM] = useState<string | null>(null)
   const router = useRouter()
   const params = useParams()
   const slug = params?.slug as string
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true)
       try {
+        // Get user ID first
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          console.error("User not authenticated")
+          return
+        }
+
         // First fetch all AMs to populate the dropdown
-        const allData = await fetchTargetAMData()
+        const allData = await fetchTargetAMData(user.id)
         setAmList(allData)
 
         // Then fetch specific AM data if slug is provided
         if (slug) {
-          const slugData = await fetchTargetAMData(slug)
+          const slugData = await fetchTargetAMData(user.id, slug)
           if (slugData.length > 0) {
             setSelectedAM(slugData[0].name)
           } else if (allData.length > 0) {
@@ -186,7 +190,7 @@ export default function TargetAMPage() {
     }
 
     loadData()
-  }, [slug])
+  }, [slug, supabase])
 
   const handleAmChange = (value: string) => {
     const selectedAmData = amList.find((am) => am.name === value)
