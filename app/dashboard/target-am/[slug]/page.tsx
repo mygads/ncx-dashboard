@@ -8,6 +8,7 @@ import { useRouter, useParams } from "next/navigation"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { LastUpdatedFooter } from "@/components/dashboard/last-updated"
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
+import Loading from "@/components/ui/loading"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { fetchDataFromSource } from "@/lib/data-source"
 
@@ -242,12 +243,9 @@ export default function TargetAMDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="flex justify-between items-center">
-          <Skeleton className="h-10 w-64" />
-          <Skeleton className="h-10 w-40" />
-        </div>
-        <Skeleton className="h-64 w-full" />
+      <div className="flex flex-col h-full">
+        <DynamicHeader />
+        <Loading />
       </div>
     )
   }
