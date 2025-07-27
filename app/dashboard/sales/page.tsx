@@ -68,7 +68,7 @@ const getRevenueTypeColor = (type: string): string => {
 async function fetchRevenueData(userId: string, selectedPeriod?: string): Promise<RevenueData[]> {
   try {
     // Always use STG sheet as the primary data source
-    console.log('Fetching data from STG sheet');
+    // console.log('Fetching data from STG sheet');
     let result = await fetchDataFromSource(userId, 'STG');
     
     if (!result.success || !result.data || result.data.length < 2) {
@@ -76,22 +76,22 @@ async function fetchRevenueData(userId: string, selectedPeriod?: string): Promis
       result = await fetchDataFromSource(userId, 'DataAutoGSlide');
     }
     
-    console.log('Revenue fetch result:', result);
+    // console.log('Revenue fetch result:', result);
     
     if (!result.success || !result.data || result.data.length < 2) {
       console.log('No data found or insufficient data');
       return [];
     }
 
-    console.log('Raw data:', result.data);
-    console.log('Headers:', result.data[0]);
+    // console.log('Raw data:', result.data);
+    // console.log('Headers:', result.data[0]);
 
     // Skip header row
     const rows = result.data.slice(1);
 
     // Check if this is STG sheet format
     if (result.data[0] && result.data[0].includes && result.data[0].includes('TARGET')) {
-      console.log('Processing STG format - comprehensive revenue and operational data');
+      // console.log('Processing STG format - comprehensive revenue and operational data');
       
       const processedData: RevenueData[] = [];
 
@@ -249,7 +249,7 @@ async function fetchRevenueData(userId: string, selectedPeriod?: string): Promis
         });
       });
 
-      console.log('Final processed STG data:', processedData);
+      // console.log('Final processed STG data:', processedData);
       return processedData;
     }
 
@@ -454,8 +454,8 @@ export default function SalesOperationPage() {
         const userId = user.id
         const [revenueResult, insightResult] = await Promise.all([fetchRevenueData(userId, selectedPeriod), fetchInsightRevenue(userId)])
 
-        console.log('Final revenue data:', revenueResult);
-        console.log('Revenue data length:', revenueResult.length);
+        // console.log('Final revenue data:', revenueResult);
+        // console.log('Revenue data length:', revenueResult.length);
         
         setRevenueData(revenueResult)
         setInsightText(insightResult)

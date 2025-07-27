@@ -197,56 +197,60 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
     checkDataSource()
   }, [user])
 
-  // Fetch Target AM data from spreadsheet
+  // Fetch Target AM data from data source
   useEffect(() => {
     async function fetchTargetAMData() {
-      if (!hasDataSource || !currentDataSource) return
+      if (!hasDataSource || !user) return
 
       try {
-        let spreadsheetId: string | undefined
-
-        if (currentDataSource.type === 'spreadsheet') {
-          spreadsheetId = currentDataSource.url
-        } else {
-          // For file uploads, we might need a different approach
-          // For now, skip Target AM data fetching for file uploads
+        // Use the same fetchDataFromSource function that other pages use
+        const { fetchDataFromSource } = await import("@/lib/data-source")
+        const dataResult = await fetchDataFromSource(user.id, "DataAutoGSlide")
+        
+        if (!dataResult.success || !dataResult.data || dataResult.data.length < 2) {
+          console.log("No Target AM data found in data source")
           return
         }
 
-        if (!spreadsheetId) return
+        const headers = dataResult.data[0]
+        const rows = dataResult.data.slice(1)
+        const bagianSlideIndex = headers.findIndex((h: string) => h === "Bagian Slide")
+        
+        if (bagianSlideIndex === -1) {
+          console.log("Bagian Slide column not found")
+          return
+        }
 
-        const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
-        const sheetName = 'DataAutoGSlide';
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-        const res = await fetch(url);
-        const json = await res.json();
-        if (!json.values || json.values.length < 2) return;
-        const headers = json.values[0];
-        const bagianSlideIndex = headers.findIndex((h: string) => h === "Bagian Slide");
-        if (bagianSlideIndex === -1) return;
-        const targetAMRows = json.values.slice(1).filter((row: any[]) => {
-          const bagianSlide = row[bagianSlideIndex] || "";
-          return bagianSlide.includes("TARGET AM WBS SULBAGTENG");
-        });
-        const uniqueAMs = new Map<string, { label: string; href: string }>();
+        const targetAMRows = rows.filter((row: any[]) => {
+          const bagianSlide = row[bagianSlideIndex] || ""
+          return bagianSlide.includes("TARGET AM WBS SULBAGTENG")
+        })
+
+        const uniqueAMs = new Map<string, { label: string; href: string }>()
+        
         targetAMRows.forEach((row: any[]) => {
-          const bagianSlide = row[bagianSlideIndex] || "";
-          const match = bagianSlide.match(/TARGET AM WBS SULBAGTENG\s*(.*?)\s*\/\s*(\d+)/i);
-          if (match && match.length >= 3) {
-            const name = match[1].trim();
-            const slug = name.toLowerCase().replace(/\s+/g, '-');
-            if (!uniqueAMs.has(name)) {
-              uniqueAMs.set(name, { label: name, href: `/dashboard/target-am/${slug}` });
+          const bagianSlide = row[bagianSlideIndex] || ""
+          const lines = bagianSlide.split("\n")
+          if (lines.length >= 2) {
+            const amInfo = lines[1] || ""
+            const nikMatch = amInfo.match(/\/\s*(\d+)/)
+            const name = amInfo.split("/")[0].trim()
+            const slug = name.toLowerCase().replace(/\s+/g, '-')
+            
+            if (name && !uniqueAMs.has(name)) {
+              uniqueAMs.set(name, { label: name, href: `/dashboard/target-am/${slug}` })
             }
           }
-        });
-        setTargetAMItems(Array.from(uniqueAMs.values()));
+        })
+
+        setTargetAMItems(Array.from(uniqueAMs.values()))
       } catch (error) {
-        // Optional: handle error
+        console.error("Error fetching Target AM data for sidebar:", error)
       }
     }
-    fetchTargetAMData();
-  }, [hasDataSource, currentDataSource]);
+    
+    fetchTargetAMData()
+  }, [hasDataSource, user])
 
   const toggleCollapse = () => {
     const newCollapsed = !collapsed

@@ -40,9 +40,13 @@ interface TargetAMData {
 // Fungsi untuk fetch data dari sumber data yang dipilih user
 async function fetchTargetAMData(userId: string, slug?: string): Promise<TargetAMData[]> {
   try {
+    // console.log("Fetching Target AM data for user:", userId, "slug:", slug)
     const dataResult = await fetchDataFromSource(userId, "DataAutoGSlide")
     
+    // console.log("Data result:", dataResult)
+    
     if (!dataResult.success || !dataResult.data || dataResult.data.length < 2) {
+      console.error("No data found in data source:", dataResult)
       throw new Error("No data found in data source")
     }
 
@@ -55,7 +59,10 @@ async function fetchTargetAMData(userId: string, slug?: string): Promise<TargetA
     const labelIndex = headers.findIndex((h: string) => h === "Label")
     const dataCleanIndex = headers.findIndex((h: string) => h === "Data Clean")
 
+    // console.log("Column indices:", { bagianSlideIndex, labelIndex, dataCleanIndex })
+
     if (bagianSlideIndex === -1 || labelIndex === -1 || dataCleanIndex === -1) {
+      console.error("Required columns not found. Headers:", headers)
       throw new Error("Required columns not found in data source")
     }
 
@@ -71,6 +78,8 @@ async function fetchTargetAMData(userId: string, slug?: string): Promise<TargetA
         const amName = bagianSlide.split("\n")[1] || ""
         const label = row[labelIndex] || ""
         const value = row[dataCleanIndex] || ""
+
+        // console.log("Processing AM data:", { amName, label, value, bagianSlide: bagianSlide.substring(0, 50) })
 
         // Create slug from name for comparison
         const amSlug = amName.toLowerCase().replace(/\s+/g, "-")
@@ -92,11 +101,16 @@ async function fetchTargetAMData(userId: string, slug?: string): Promise<TargetA
     // Mengubah data ke format yang dibutuhkan
     const targetAMResult: TargetAMData[] = []
 
+    // console.log("AM data map size:", amDataMap.size)
+    // console.log("Available AM names:", Array.from(amDataMap.keys()))
+
     amDataMap.forEach((dataMap, amName) => {
       const nikMatch = amName.match(/\/\s*(\d+)/)
       const nik = nikMatch ? nikMatch[1] : ""
       const name = amName.split("/")[0].trim()
       const amSlug = name.toLowerCase().replace(/\s+/g, "-")
+
+      // console.log("Processing AM:", { name, nik, amSlug, slug, shouldInclude: !slug || amSlug === slug })
 
       // If slug is provided, only include the matching AM
       if (slug && amSlug !== slug) {
@@ -129,6 +143,7 @@ async function fetchTargetAMData(userId: string, slug?: string): Promise<TargetA
       })
     })
 
+    // console.log("Final target AM result:", targetAMResult)
     return targetAMResult
   } catch (error) {
     console.error("Error fetching target AM data:", error)
@@ -159,6 +174,8 @@ export default function TargetAMDetailPage() {
     const loadData = async () => {
       setLoading(true)
       try {
+        // console.log("Loading Target AM data for slug:", slug)
+        
         // Get user ID first
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
@@ -166,25 +183,44 @@ export default function TargetAMDetailPage() {
           return
         }
 
+        // console.log("User authenticated:", user.id)
+
+        // Add timeout to prevent infinite loading
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Request timeout after 30 seconds")), 30000)
+        )
+
         // First fetch all AMs to populate the dropdown
-        const allData = await fetchTargetAMData(user.id)
+        const allDataPromise = fetchTargetAMData(user.id)
+        const allData = await Promise.race([allDataPromise, timeoutPromise]) as TargetAMData[]
+        
+        // console.log("All AM data loaded:", allData.length, "items")
         setAmList(allData)
 
         // Then fetch specific AM data if slug is provided
         if (slug) {
-          const slugData = await fetchTargetAMData(user.id, slug)
+          const slugDataPromise = fetchTargetAMData(user.id, slug)
+          const slugData = await Promise.race([slugDataPromise, timeoutPromise]) as TargetAMData[]
+          
+          // console.log("Slug data loaded:", slugData.length, "items for slug:", slug)
           if (slugData.length > 0) {
             setSelectedAM(slugData[0].name)
           } else if (allData.length > 0) {
             // If no matching AM found for slug, select the first one
+            // console.log("No matching AM found for slug, selecting first:", allData[0].name)
             setSelectedAM(allData[0].name)
           }
         } else if (allData.length > 0) {
           // If no slug provided, select the first AM
+          // console.log("No slug provided, selecting first:", allData[0].name)
           setSelectedAM(allData[0].name)
         }
       } catch (error) {
         console.error("Error loading data:", error)
+        if (error instanceof Error && error.message.includes("timeout")) {
+          // Handle timeout - still show UI but with error message
+          setAmList([])
+        }
       } finally {
         setLoading(false)
       }

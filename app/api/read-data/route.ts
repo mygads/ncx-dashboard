@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
       }
 
       const filePath = join(process.cwd(), 'public', 'uploads', dataSource.filename)
+      // console.log("Reading file:", filePath, "for sheet:", sheetName)
       
       try {
         const fileBuffer = await readFile(filePath)
@@ -90,6 +91,8 @@ export async function GET(request: NextRequest) {
           // Handle Excel file (.xlsx, .xls)
           const workbook = XLSX.read(fileBuffer, { type: 'buffer' })
           
+          // console.log("Available sheets:", workbook.SheetNames)
+          
           // Try to find the specific sheet, or use the first sheet
           let worksheetName = sheetName
           if (!workbook.SheetNames.includes(sheetName)) {
@@ -99,6 +102,8 @@ export async function GET(request: NextRequest) {
               worksheetName = workbook.SheetNames[0]
             }
           }
+          
+          // console.log("Using worksheet:", worksheetName)
           
           const worksheet = workbook.Sheets[worksheetName]
           if (!worksheet) {
@@ -114,6 +119,8 @@ export async function GET(request: NextRequest) {
             raw: false,
             dateNF: 'yyyy-mm-dd'
           })
+          
+          // console.log("Sheet data loaded:", sheetData.length, "rows")
         }
         
       } catch (fileError) {
