@@ -454,7 +454,7 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
         </div>
 
         {/* Target DATEL Section */}
-        <div className="py-2">
+        {/* <div className="py-2">
           <button
             onClick={() => hasDataSource && setTargetDATELExpanded(!targetDATELExpanded)}
             className={cn(
@@ -497,7 +497,7 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
               ))}
             </div>
           )}
-        </div>
+        </div> */}
       </div>
 
       {/* User Info di bawah, di atas logout */}

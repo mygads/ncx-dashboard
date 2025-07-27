@@ -1,14 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from "@supabase/supabase-js";
 
-const SPREADSHEET_ID = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+const API_KEY = process.env.NEXT_GOOGLE_API_KEY;
 
 export async function GET(request: NextRequest) {
     try {
         // Check if required environment variables are set
-        if (!SPREADSHEET_ID || !API_KEY) {
+        if (!API_KEY) {
             return NextResponse.json(
-                { error: 'Missing required environment variables' },
+                { error: 'Missing Google API key' },
+                { status: 400 }
+            );
+        }
+
+        // Create Supabase client with service key for server-side operations
+        const supabase = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+
+        const { searchParams } = new URL(request.url);
+        const userId = searchParams.get('userId');
+
+        if (!userId) {
+            return NextResponse.json(
+                { error: 'User ID is required' },
+                { status: 400 }
+            );
+        }
+
+        // Get the active spreadsheet data source from database
+        const { data: dataSource, error } = await supabase
+            .from('data_sources')
+            .select('url, type, name')
+            .eq('user_id', userId)
+            .eq('type', 'spreadsheet')
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .single();
+
+        if (error || !dataSource) {
+            return NextResponse.json(
+                { error: 'No active spreadsheet data source found for user' },
+                { status: 404 }
+            );
+        }
+
+        const SPREADSHEET_ID = dataSource.url;
+
+        if (!SPREADSHEET_ID) {
+            return NextResponse.json(
+                { error: 'Spreadsheet ID not found in data source' },
                 { status: 400 }
             );
         }

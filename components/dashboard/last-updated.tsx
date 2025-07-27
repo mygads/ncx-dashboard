@@ -3,9 +3,6 @@
 import { useEffect, useState } from "react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 
-const SPREADSHEET_ID = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
-
 export function useLastUpdated() {
     const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
     const [dataSource, setDataSource] = useState<'spreadsheet' | 'file' | null>(null)
@@ -20,44 +17,16 @@ export function useLastUpdated() {
                     return
                 }
 
-                // Check if we should prioritize spreadsheet over uploaded files
-                const prioritizeSpreadsheet = process.env.NEXT_PUBLIC_PRIORITIZE_SPREADSHEET === 'true'
+                // Get the current active data source
+                const { data: dataSources, error: dataSourceError } = await supabase
+                    .from('data_sources')
+                    .select('uploaded_at, updated_at, type, url')
+                    .eq('user_id', user.id)
+                    .order('updated_at', { ascending: false })
+                    .limit(1)
 
-                let spreadsheetDate: Date | null = null
-                let fileDate: Date | null = null
-                let actualDataSourceType: 'spreadsheet' | 'file' | null = null
-
-                // Try to get spreadsheet last updated time if credentials are available
-                if (SPREADSHEET_ID && API_KEY) {
-                    try {
-                        const response = await fetch('/api/spreadsheet-last-updated')
-                        if (response.ok) {
-                            const data = await response.json()
-                            if (data.lastUpdated) {
-                                spreadsheetDate = new Date(data.lastUpdated)
-                            }
-                        }
-                    } catch (driveError) {
-                        console.warn('Could not fetch spreadsheet last updated time:', driveError)
-                    }
-                }
-
-                // Try to get the most recent data source upload/update
-                try {
-                    const { data: dataSources, error: dataSourceError } = await supabase
-                        .from('data_sources')
-                        .select('uploaded_at, updated_at, type')
-                        .eq('user_id', user.id)
-                        .order('updated_at', { ascending: false })
-                        .limit(1)
-
-                    if (!dataSourceError && dataSources && dataSources.length > 0) {
-                        const latestSource = dataSources[0]
-                        fileDate = new Date(latestSource.updated_at || latestSource.uploaded_at)
-                        actualDataSourceType = latestSource.type // Use the actual type from database
-                    }
-                } catch (dataSourceError) {
-                    // data_sources table might not exist, try dashboard_data as fallback
+                if (dataSourceError || !dataSources || dataSources.length === 0) {
+                    // Fallback to dashboard_data if data_sources table doesn't exist or no data
                     console.warn('data_sources table not accessible, using dashboard_data as fallback')
                     
                     const { data: dashboardData, error: dataError } = await supabase
@@ -68,25 +37,45 @@ export function useLastUpdated() {
 
                     if (!dataError && dashboardData && dashboardData.length > 0) {
                         const latestData = dashboardData[0]
-                        fileDate = new Date(latestData.updated_at || latestData.created_at)
-                        actualDataSourceType = 'file' // Assume file upload for dashboard_data fallback
+                        setLastUpdated(new Date(latestData.updated_at || latestData.created_at))
+                        setDataSource('file') // Assume file upload for dashboard_data fallback
+                    } else {
+                        setLastUpdated(new Date())
+                        setDataSource(null)
                     }
+                    return
                 }
 
-                // Determine which date to use based on priority and availability
-                if (prioritizeSpreadsheet && spreadsheetDate) {
-                    setLastUpdated(spreadsheetDate)
+                const activeDataSource = dataSources[0]
+                
+                if (activeDataSource.type === 'spreadsheet') {
+                    // For spreadsheet data source, get last updated time from Google Drive API
+                    try {
+                        const response = await fetch(`/api/spreadsheet-last-updated?userId=${user.id}`)
+                        if (response.ok) {
+                            const data = await response.json()
+                            if (data.lastUpdated) {
+                                setLastUpdated(new Date(data.lastUpdated))
+                                setDataSource('spreadsheet')
+                                return
+                            }
+                        }
+                    } catch (driveError) {
+                        console.warn('Could not fetch spreadsheet last updated time:', driveError)
+                    }
+                    
+                    // Fallback to database updated_at if Google API fails
+                    setLastUpdated(new Date(activeDataSource.updated_at || activeDataSource.uploaded_at))
                     setDataSource('spreadsheet')
-                } else if (fileDate && (!spreadsheetDate || fileDate > spreadsheetDate)) {
-                    setLastUpdated(fileDate)
-                    setDataSource(actualDataSourceType) // Use the actual type from database
-                } else if (spreadsheetDate) {
-                    setLastUpdated(spreadsheetDate)
-                    setDataSource('spreadsheet')
+                    
+                } else if (activeDataSource.type === 'file') {
+                    // For file upload data source, use database updated_at
+                    setLastUpdated(new Date(activeDataSource.updated_at || activeDataSource.uploaded_at))
+                    setDataSource('file')
                 } else {
-                    // Fallback to current time
-                    setLastUpdated(new Date())
-                    setDataSource(null)
+                    // Unknown type, fallback
+                    setLastUpdated(new Date(activeDataSource.updated_at || activeDataSource.uploaded_at))
+                    setDataSource(activeDataSource.type)
                 }
                 
             } catch (error) {

@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
 
     if (dataSource.type === 'spreadsheet') {
       // Handle Google Spreadsheet
-      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY
+      const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY
       if (!apiKey) {
         return NextResponse.json(
           { error: "Google API key not configured" },

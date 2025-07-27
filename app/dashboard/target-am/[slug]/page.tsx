@@ -141,8 +141,9 @@ function getAMPhotoUrl(name: string) {
   if (!name) return "/placeholder.svg?height=300&width=250";
   // Nama file di bucket: nama AM persis, dengan ekstensi .png
   // Perlu encodeURIComponent untuk handle spasi dan karakter khusus
+  const url = process.env.NEXT_PUBLIC_PROFILE_SUPABASE_URL;
   const encodedName = encodeURIComponent(name);
-  return `https://tgftiktwtqyqpcrofevj.supabase.co/storage/v1/object/public/profile/${encodedName}.png`;
+  return `${url}${encodedName}.png`;
 }
 
 export default function TargetAMDetailPage() {
