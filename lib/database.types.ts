@@ -3,60 +3,37 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   public: {
     Tables: {
-      users: {
+      data_sources: {
         Row: {
           id: string
-          email: string
-          full_name: string | null
-          avatar_url: string | null
+          user_id: string
+          type: 'spreadsheet' | 'file'
+          name: string
+          url: string | null
+          filename: string | null
+          uploaded_at: string
           created_at: string
           updated_at: string
         }
         Insert: {
-          id: string
-          email: string
-          full_name?: string | null
-          avatar_url?: string | null
+          id?: string
+          user_id: string
+          type: 'spreadsheet' | 'file'
+          name: string
+          url?: string | null
+          filename?: string | null
+          uploaded_at?: string
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
-          email?: string
-          full_name?: string | null
-          avatar_url?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-      }
-      dashboard_data: {
-        Row: {
-          id: number
-          slide_number: number
-          slide_section: string
-          label: string
-          value: string
-          clean_value: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: number
-          slide_number: number
-          slide_section: string
-          label: string
-          value: string
-          clean_value: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: number
-          slide_number?: number
-          slide_section?: string
-          label?: string
-          value?: string
-          clean_value?: string
+          user_id?: string
+          type?: 'spreadsheet' | 'file'
+          name?: string
+          url?: string | null
+          filename?: string | null
+          uploaded_at?: string
           created_at?: string
           updated_at?: string
         }

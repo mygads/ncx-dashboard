@@ -101,23 +101,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error
       }
 
-      // After signup, insert user profile data
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (user) {
-        const { error: profileError } = await supabase.from("users").insert({
-          id: user.id,
-          email: email,
-          full_name: fullName,
-        })
-
-        if (profileError) {
-          console.error("Error creating profile:", profileError)
-        }
-      }
-
       router.push("/login?message=Check your email to confirm your account")
     } catch (error) {
       console.error("Error in signUp:", error)

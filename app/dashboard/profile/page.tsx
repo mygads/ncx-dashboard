@@ -29,21 +29,12 @@ export default function ProfilePage() {
     const supabase = createClientComponentClient()
 
     useEffect(() => {
-        async function fetchUserInfo() {
-            if (user) {
-                setEmail(user.email || "")
-
-                const { data, error } = await supabase.from("users").select("full_name").eq("id", user.id).single()
-
-                if (!error && data) {
-                    setFullName(data.full_name || "")
-                }
-            }
-            setIsLoading(false)
+        if (user) {
+            setEmail(user.email || "")
+            setFullName(user.user_metadata?.full_name || "")
         }
-
-        fetchUserInfo()
-    }, [user, supabase])
+        setIsLoading(false)
+    }, [user])
 
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -51,7 +42,10 @@ export default function ProfilePage() {
         setMessage(null)
 
         try {
-            const { error } = await supabase.from("users").update({ full_name: fullName }).eq("id", user?.id)
+            // Update user metadata in Supabase Auth
+            const { error } = await supabase.auth.updateUser({
+                data: { full_name: fullName }
+            })
 
             if (error) throw error
 

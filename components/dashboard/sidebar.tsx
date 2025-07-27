@@ -45,12 +45,12 @@ const topRoutes = [
     href: "/dashboard/sales",
     requiresDataSource: true,
   },
-  {
-    label: "Digital Product",
-    icon: Store,
-    href: "/dashboard/products",
-    requiresDataSource: true,
-  },
+  // {
+  //   label: "Digital Product",
+  //   icon: Store,
+  //   href: "/dashboard/products",
+  //   requiresDataSource: true,
+  // },
 ]
 
 const middleRoutes = [
@@ -158,19 +158,13 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
     }
   }, [collapsedProp])
 
-  // Fetch user full name and email from DB
+  // Use auth user data directly
   useEffect(() => {
-    async function fetchUserInfo() {
-      if (user) {
-        const supabase = createClientComponentClient()
-        const { data, error } = await supabase.from("users").select("full_name, email").eq("id", user.id).single()
-        if (!error && data) {
-          setFullName(data.full_name)
-          setUserEmail(data.email)
-        }
-      }
+    if (user) {
+      // Use metadata from auth user or set defaults
+      setFullName(user.user_metadata?.full_name || user.email || 'User')
+      setUserEmail(user.email || '')
     }
-    fetchUserInfo()
   }, [user])
 
   // Check for data source
