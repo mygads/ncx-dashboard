@@ -41,7 +41,7 @@ export function SalesBarChart({ data, title, barColor = "#EF4444", lineColor = "
         datasets: [
           {
             type: "bar",
-            label: "Nilai",
+            label: "Value",
             data: data.map((item) => Math.round(item.totalOrders)),
             backgroundColor: barColor,
             order: 1,
@@ -86,7 +86,7 @@ export function SalesBarChart({ data, title, barColor = "#EF4444", lineColor = "
             position: "left",
             title: {
               display: true,
-              text: "Nilai (Rp)",
+              text: "Value (Rp)",
               font: {
                 weight: "bold",
               },

@@ -555,7 +555,7 @@ export default function SalesOperationPage() {
           <div className="w-64">
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
               <SelectTrigger>
-                <SelectValue placeholder="Periode" />
+                <SelectValue placeholder="Period" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All">All Periods</SelectItem>
@@ -766,13 +766,13 @@ export default function SalesOperationPage() {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Periode
+                          Period
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Jenis Penjualan
+                          Sales Type
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Nilai
+                          Value
                         </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Cumulative

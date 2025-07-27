@@ -289,7 +289,7 @@ export default function AnalyticsDashboard() {
         setUpdateTextSummary(updateResult);
       } catch (error) {
         console.error("Error loading data:", error);
-        setDataSourceError("Gagal memuat data. Pastikan sumber data sudah dikonfigurasi dengan benar.");
+        setDataSourceError("Failed to load data. Please ensure the data source is configured correctly.");
       }
     };
 
@@ -489,7 +489,7 @@ export default function AnalyticsDashboard() {
           </div>
 
           {/* HOTDA Bar Chart */}
-          <ModernHotdaBarChart data={hotdaData} title="Jumlah Orders berdasarkan HOTDA" className="col-span-2" />
+          <ModernHotdaBarChart data={hotdaData} title="Orders by HOTDA" className="col-span-2" />
         </div>
 
         {/* Footer */}

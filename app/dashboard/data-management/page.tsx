@@ -101,8 +101,8 @@ export default function DataManagementPage() {
     if (!currentDataSource || !user) return
 
     const confirmed = window.confirm(
-      "Apakah Anda yakin ingin menghapus sumber data ini? " +
-      "Tindakan ini akan menghapus akses ke semua menu dashboard dan tidak dapat dibatalkan."
+      "Are you sure you want to delete this data source? " +
+      "This action will remove access to all dashboard menus and cannot be undone."
     )
 
     if (!confirmed) return
@@ -133,8 +133,8 @@ export default function DataManagementPage() {
       setTestResult(null)
 
       toast({
-        title: "Berhasil",
-        description: "Sumber data berhasil dihapus"
+        title: "Success",
+        description: "Data source successfully deleted"
       })
 
       // Redirect to home to set up new data source
@@ -144,7 +144,7 @@ export default function DataManagementPage() {
       console.error("Error deleting data source:", error)
       toast({
         title: "Error",
-        description: "Gagal menghapus sumber data",
+        description: "Failed to delete data source",
         variant: "destructive"
       })
     } finally {
@@ -200,17 +200,17 @@ export default function DataManagementPage() {
                 </Badge>
                 <Badge variant="outline">
                   <Check className="h-3 w-3 mr-1" />
-                  Aktif
+                  Active
                 </Badge>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm font-medium">Nama</Label>
+                  <Label className="text-sm font-medium">Name</Label>
                   <p className="text-sm text-muted-foreground">{currentDataSource.name}</p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Tanggal Setup</Label>
+                  <Label className="text-sm font-medium">Setup Date</Label>
                   <p className="text-sm text-muted-foreground flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
                     {new Date(currentDataSource.uploadedAt).toLocaleDateString('id-ID', {
@@ -244,7 +244,7 @@ export default function DataManagementPage() {
 
               {currentDataSource.type === 'file' && currentDataSource.filename && (
                 <div>
-                  <Label className="text-sm font-medium">Nama File</Label>
+                  <Label className="text-sm font-medium">Filename</Label>
                   <p className="text-sm text-muted-foreground font-mono bg-muted p-2 rounded">
                     {currentDataSource.filename}
                   </p>
@@ -306,7 +306,7 @@ export default function DataManagementPage() {
                   className="w-full"
                 >
                   <Database className="h-4 w-4 mr-2" />
-                  Ganti Sumber Data
+                  Change Data Source
                 </Button>
 
                 <Button 
@@ -316,18 +316,18 @@ export default function DataManagementPage() {
                   className="w-full"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  {isLoading ? "Menghapus..." : "Hapus Sumber Data"}
+                  {isLoading ? "Deleting..." : "Delete Data Source"}
                 </Button>
               </div>
 
               <Separator />
 
               <div className="text-xs text-muted-foreground">
-                <p><strong>Catatan:</strong></p>
+                <p><strong>Note:</strong></p>
                 <ul className="list-disc list-inside space-y-1 mt-1">
-                  <li>Mengganti sumber data akan mengarahkan Anda ke halaman setup baru</li>
-                  <li>Menghapus sumber data akan menghilangkan akses ke semua menu dashboard</li>
-                  <li>Pastikan untuk backup data penting sebelum menghapus sumber data</li>
+                  <li>Changing data source will redirect you to the new setup page</li>
+                  <li>Deleting data source will remove access to all dashboard menus</li>
+                  <li>Make sure to backup important data before deleting the data source</li>
                 </ul>
               </div>
             </CardContent>
@@ -338,22 +338,22 @@ export default function DataManagementPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5" />
-              Belum Ada Sumber Data
+              No Data Source Yet
             </CardTitle>
             <CardDescription>
-              Anda belum mengatur sumber data untuk dashboard
+              You haven't set up a data source for the dashboard yet
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center py-8">
             <Database className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Setup Sumber Data</h3>
+            <h3 className="text-lg font-semibold mb-2">Setup Data Source</h3>
             <p className="text-muted-foreground mb-6">
-              Pilih dan konfigurasikan sumber data (Google Spreadsheet atau Upload File) 
-              untuk mulai menggunakan dashboard analytics.
+              Choose and configure a data source (Google Spreadsheet or File Upload) 
+              to start using the analytics dashboard.
             </p>
             <Button onClick={goToDataSourceSetup}>
               <Database className="h-4 w-4 mr-2" />
-              Setup Sumber Data
+              Setup Data Source
             </Button>
           </CardContent>
         </Card>

@@ -19,7 +19,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { fetchDataFromSource } from "@/lib/data-source"
 Chart.register(...registerables)
 
-// Interface khusus untuk data Unit 
+// Special interface for Unit data
 interface UnitData {
   name: string
   total: number
@@ -28,7 +28,7 @@ interface UnitData {
   achPercentage: number
 }
 
-// Fungsi untuk fetch data Unit dari sumber data yang dipilih user
+// Function to fetch Unit data from user-selected data source
 async function fetchUnitData(userId: string) {
   const result = await fetchDataFromSource(userId, 'UNIT NCX');
   if (!result.success || !result.data || result.data.length < 2) return [];
@@ -45,14 +45,14 @@ async function fetchUnitData(userId: string) {
   });
 }
 
-// Fungsi untuk fetch insight Unit dari sumber data yang dipilih user
+// Function to fetch Unit insight from user-selected data source
 async function fetchInsightUnit(userId: string) {
   const result = await fetchDataFromSource(userId, 'Update Text (Looker Studio)');
   if (!result.success || !result.data || result.data.length < 1) return "";
   const headers = result.data[0];
   const idx = headers.findIndex((h: string) => h.toLowerCase().includes("insight unit"));
   if (idx === -1) return "";
-  // Data insight ada di kolom ke-8 (idx + 1) pada baris header
+  // Insight data is in column (idx + 1) in the header row
   return headers[idx + 1] || "";
 }
 

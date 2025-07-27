@@ -256,8 +256,8 @@ export default function TargetAMDetailPage() {
     return (
       <div className="p-6">
         <div className="bg-red-50 p-4 rounded-lg border border-red-200 text-red-700">
-          <h2 className="text-lg font-semibold">Data tidak ditemukan</h2>
-          <p>Tidak dapat menemukan data target AM. Silakan periksa koneksi ke spreadsheet.</p>
+          <h2 className="text-lg font-semibold">Data not found</h2>
+          <p>Unable to find target AM data. Please check the connection to the spreadsheet.</p>
         </div>
       </div>
     )
@@ -272,7 +272,7 @@ export default function TargetAMDetailPage() {
           <div className=" w-1/4 mb-4">
             <Select value={selectedAM || ""} onValueChange={handleAmChange}>
               <SelectTrigger>
-                <SelectValue placeholder="Pilih Account Manager" />
+                <SelectValue placeholder="Select Account Manager" />
               </SelectTrigger>
               <SelectContent>
                 {amList.map((am) => (

@@ -151,7 +151,7 @@ export default function DashboardHome() {
         .eq('user_id', user?.id)
 
       setUploadProgress(75)
-      setLoadingMessage("Menyimpan konfigurasi baru...")
+      setLoadingMessage("Saving new configuration...")
 
       // Save new data source
       const { data, error } = await supabase
@@ -169,15 +169,15 @@ export default function DashboardHome() {
       if (error) throw error
 
       setUploadProgress(100)
-      setLoadingMessage("Berhasil terhubung!")
+      setLoadingMessage("Successfully connected!")
 
       setCurrentDataSource(data)
       setActiveTab("manage")
       setSpreadsheetUrl("")
 
       toast({
-        title: "Berhasil",
-        description: "Google Spreadsheet berhasil dihubungkan"
+        title: "Success",
+        description: "Google Spreadsheet successfully connected"
       })
 
       // Trigger a page refresh to update sidebar state after a short delay
@@ -189,7 +189,7 @@ export default function DashboardHome() {
       console.error("Error connecting spreadsheet:", error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Gagal menghubungkan spreadsheet",
+        description: error instanceof Error ? error.message : "Failed to connect spreadsheet",
         variant: "destructive"
       })
     } finally {
@@ -255,20 +255,20 @@ export default function DashboardHome() {
 
       clearInterval(progressInterval)
       setUploadProgress(90)
-      setLoadingMessage("Memproses file...")
+      setLoadingMessage("Processing file...")
 
       if (!response.ok) {
-        throw new Error('Gagal mengupload file')
+        throw new Error('Failed to upload file')
       }
 
       const result = await response.json()
 
       if (!result.success) {
-        throw new Error(result.error || 'Gagal mengupload file')
+        throw new Error(result.error || 'Failed to upload file')
       }
 
       setUploadProgress(100)
-      setLoadingMessage("Upload berhasil!")
+      setLoadingMessage("Upload successful!")
 
       // Update current data source from API response
       setCurrentDataSource(result.dataSource)
@@ -276,8 +276,8 @@ export default function DashboardHome() {
       setUploadFile(null)
 
       toast({
-        title: "Berhasil",
-        description: "File berhasil diupload"
+        title: "Success",
+        description: "File successfully uploaded"
       })
 
       // Trigger a page refresh to update sidebar state after a short delay
@@ -289,7 +289,7 @@ export default function DashboardHome() {
       console.error("Error uploading file:", error)
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Gagal mengupload file",
+        description: error instanceof Error ? error.message : "Failed to upload file",
         variant: "destructive"
       })
     } finally {
@@ -304,7 +304,7 @@ export default function DashboardHome() {
 
     setIsLoading(true)
     setUploadProgress(0)
-    setLoadingMessage("Menghapus data source...")
+    setLoadingMessage("Deleting data source...")
 
     try {
       setUploadProgress(25)
@@ -319,7 +319,7 @@ export default function DashboardHome() {
       if (error) throw error
 
       setUploadProgress(60)
-      setLoadingMessage("Menghapus file fisik...")
+      setLoadingMessage("Deleting physical file...")
 
       // If it's a file, delete the physical file
       if (currentDataSource.type === 'file' && currentDataSource.filename) {
@@ -331,14 +331,14 @@ export default function DashboardHome() {
       }
 
       setUploadProgress(100)
-      setLoadingMessage("Berhasil dihapus!")
+      setLoadingMessage("Successfully deleted!")
 
       setCurrentDataSource(null)
       setActiveTab("select")
 
       toast({
-        title: "Berhasil",
-        description: "Sumber data berhasil dihapus"
+        title: "Success",
+        description: "Data source successfully deleted"
       })
 
       // Refresh page to update sidebar
@@ -393,10 +393,10 @@ export default function DashboardHome() {
           </div>
           <div>
             <h1 className="text-xl md:text-2xl font-bold">
-              Selamat Datang, {user?.user_metadata?.full_name || user?.email || 'User'}
+              Welcome, {user?.user_metadata?.full_name || user?.email || 'User'}
             </h1>
             <p className="text-red-100 text-sm md:text-base">
-              Kelola sumber data dashboard Anda di sini
+              Manage your dashboard data sources here
             </p>
           </div>
         </div>
@@ -434,8 +434,8 @@ export default function DashboardHome() {
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-lg font-semibold">Akses Ditolak</h2>
-          <p className="text-muted-foreground">Silakan login untuk mengakses dashboard</p>
+          <h2 className="text-lg font-semibold">Access Denied</h2>
+          <p className="text-muted-foreground">Please login to access the dashboard</p>
         </div>
       </div>
     )
@@ -473,10 +473,10 @@ export default function DashboardHome() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="select" disabled={currentDataSource !== null}>
-                Pilih Sumber Data
+                Select Data Source
               </TabsTrigger>
               <TabsTrigger value="manage" disabled={currentDataSource === null}>
-                Kelola Data
+                Manage Data Source
               </TabsTrigger>
             </TabsList>
 
@@ -485,10 +485,10 @@ export default function DashboardHome() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <FileSpreadsheet className="h-5 w-5" />
-                    Pilih Sumber Data
+                    Select Data Source
                   </CardTitle>
                   <CardDescription>
-                    Pilih sumber data yang akan digunakan untuk dashboard analytics
+                    Select the data source to be used for dashboard analytics
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -515,7 +515,7 @@ export default function DashboardHome() {
                           disabled={isLoading}
                         />
                         <p className="text-sm text-muted-foreground">
-                          Masukkan URL lengkap atau ID dari Google Spreadsheet
+                          Enter the complete URL or ID of the Google Spreadsheet
                         </p>
                       </div>
                       
@@ -535,13 +535,13 @@ export default function DashboardHome() {
                         disabled={isLoading}
                         className="w-full"
                       >
-                        {isLoading ? `${loadingMessage}...` : "Hubungkan Spreadsheet"}
+                        {isLoading ? `${loadingMessage}...` : "Connect Spreadsheet"}
                       </Button>
                     </TabsContent>
 
                     <TabsContent value="upload" className="space-y-4">
                       <div className="space-y-2">
-                        <Label htmlFor="file-upload">Upload File Excel atau CSV</Label>
+                        <Label htmlFor="file-upload">Upload Excel File or CSV</Label>
                         <Input
                           id="file-upload"
                           type="file"
@@ -550,14 +550,14 @@ export default function DashboardHome() {
                           disabled={isLoading}
                         />
                         <p className="text-sm text-muted-foreground">
-                          Mendukung format: Excel (.xlsx, .xls) dan CSV (.csv)
+                          Supports formats: Excel (.xlsx, .xls) and CSV (.csv)
                         </p>
                       </div>
                       {uploadFile && (
                         <Alert>
                           <FileText className="h-4 w-4" />
                           <AlertDescription>
-                            File dipilih: <strong>{uploadFile.name}</strong> ({(uploadFile.size / 1024 / 1024).toFixed(2)} MB)
+                            Selected file: <strong>{uploadFile.name}</strong> ({(uploadFile.size / 1024 / 1024).toFixed(2)} MB)
                           </AlertDescription>
                         </Alert>
                       )}
@@ -599,7 +599,7 @@ export default function DashboardHome() {
                       Sumber Data Aktif
                     </CardTitle>
                     <CardDescription>
-                      Data source yang sedang digunakan untuk dashboard
+                      Data source currently being used for the dashboard
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -609,17 +609,17 @@ export default function DashboardHome() {
                       </Badge>
                       <Badge variant="outline">
                         <Check className="h-3 w-3 mr-1" />
-                        Aktif
+                        Active
                       </Badge>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <Label className="text-sm font-medium">Nama</Label>
+                        <Label className="text-sm font-medium">Name</Label>
                         <p className="text-sm text-muted-foreground">{currentDataSource.name}</p>
                       </div>
                       <div>
-                        <Label className="text-sm font-medium">Tanggal Upload</Label>
+                        <Label className="text-sm font-medium">Upload Date</Label>
                         <p className="text-sm text-muted-foreground flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
                           {new Date(currentDataSource.uploadedAt).toLocaleDateString('id-ID', {
@@ -644,7 +644,7 @@ export default function DashboardHome() {
 
                     {currentDataSource.type === 'file' && currentDataSource.filename && (
                       <div>
-                        <Label className="text-sm font-medium">Nama File</Label>
+                        <Label className="text-sm font-medium">Filename</Label>
                         <p className="text-sm text-muted-foreground font-mono bg-muted p-2 rounded">
                           {currentDataSource.filename}
                         </p>
@@ -654,7 +654,7 @@ export default function DashboardHome() {
                     <Separator />
 
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">Aksi</Label>
+                      <Label className="text-sm font-medium">Action</Label>
                       
                       {/* Progress indicator for delete operation */}
                       {isLoading && (
@@ -674,10 +674,10 @@ export default function DashboardHome() {
                         className="w-full"
                       >
                         <Trash2 className="h-4 w-4 mr-2" />
-                        {isLoading ? `${loadingMessage}...` : "Hapus Sumber Data"}
+                        {isLoading ? `${loadingMessage}...` : "Delete Data Source"}
                       </Button>
                       <p className="text-xs text-muted-foreground">
-                        Menghapus sumber data akan menghilangkan akses ke semua menu dashboard
+                        Deleting the data source will remove access to all dashboard menus
                       </p>
                     </div>
                   </CardContent>

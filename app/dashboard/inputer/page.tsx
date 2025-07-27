@@ -19,7 +19,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { fetchDataFromSource } from "@/lib/data-source"
 Chart.register(...registerables)
 
-// Interface untuk data Inputer
+// Interface for Inputer data
 interface InputerData {
   name: string
   total: number
@@ -28,7 +28,7 @@ interface InputerData {
   achPercentage: number
 }
 
-// Fungsi untuk fetch data Imputer dari sumber data yang dipilih user
+// Function to fetch Inputer data from user-selected data source
 async function fetchImputerData(userId: string) {
   const result = await fetchDataFromSource(userId, 'INPUTER NCX');
   if (!result.success || !result.data || result.data.length < 2) return [];
@@ -45,14 +45,14 @@ async function fetchImputerData(userId: string) {
   });
 }
 
-// Fungsi untuk fetch insight Imputer dari sumber data yang dipilih user
+// Function to fetch Inputer insight from user-selected data source
 async function fetchInsightImputer(userId: string) {
   const result = await fetchDataFromSource(userId, 'Update Text (Looker Studio)');
   if (!result.success || !result.data || result.data.length < 1) return "";
   const headers = result.data[0];
   const idx = headers.findIndex((h: string) => h.toLowerCase().includes("insight inputer"));
   if (idx === -1) return "";
-  // Data insight ada di kolom ke-8 (idx + 1) pada baris header
+  // Insight data is in column (idx + 1) in the header row
   return headers[idx + 1] || "";
 }
 
