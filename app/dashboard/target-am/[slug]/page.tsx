@@ -383,7 +383,7 @@ export default function TargetAMDetailPage() {
                       height={250}
                       className="object-cover object-top w-full h-full"
                       style={{ objectFit: "cover", objectPosition: "top" }}
-                      onError={(e: any) => { e.target.src = "/placeholder.svg?height=300&width=250"; }}
+                      onError={(e: any) => { e.target.src = "/users.png?height=300&width=250"; }}
                     />
                   </div>
                   <div className="bg-red-600 text-white p-2 text-center shadow-lg flex-1 flex flex-col justify-center">
