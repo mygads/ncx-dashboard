@@ -510,7 +510,12 @@ export default function DashboardHome() {
                     <TabsList className="grid w-full grid-cols-2">
                       <TabsTrigger value="spreadsheet" className="flex items-center gap-2">
                         <Link2 className="h-4 w-4" />
-                        Google Spreadsheet
+                        <div className="flex items-center gap-2">
+                          Google Spreadsheet
+                          <Badge variant="secondary" className="text-xs">
+                            Recommended
+                          </Badge>
+                        </div>
                       </TabsTrigger>
                       <TabsTrigger value="upload" className="flex items-center gap-2">
                         <Upload className="h-4 w-4" />
