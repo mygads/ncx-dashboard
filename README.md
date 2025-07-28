@@ -57,7 +57,7 @@ NEXT_PUBLIC_SPREADSHEET_API_KEY=
 NEXT_PUBLIC_GOOGLE_API_KEY=
 ```
 
-> **Note**: The `NEXT_PUBLIC_SPREADSHEET_ID` is no longer needed as the application now supports dynamic data source management per user.
+https://docs.google.com/spreadsheets/d/1WupxIMrlVyzEQdBxWK6KHQHe3VBjvQpWwDdqN2h8Q_U/edit?usp=sharing
 
 ### 3. Supabase Setup
 
