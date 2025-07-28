@@ -4,6 +4,9 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/auth-context"
+import { getUserDisplayName, getUserEmail, debugUserData } from "@/lib/user-utils"
+import { triggerUserDataSync } from "@/lib/user-hooks"
+import { forceAuthRefresh, validateUserMetadata } from "@/lib/auth-refresh"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,7 +19,7 @@ import { Separator } from "@/components/ui/separator"
 import Loading from "@/components/ui/loading"
 
 export default function ProfilePage() {
-    const { user } = useAuth()
+    const { user, refreshUser } = useAuth()
     const [fullName, setFullName] = useState("")
     const [email, setEmail] = useState("")
     const [currentPassword, setCurrentPassword] = useState("")
@@ -29,12 +32,38 @@ export default function ProfilePage() {
     const supabase = createClientComponentClient()
 
     useEffect(() => {
-        if (user) {
-            setEmail(user.email || "")
-            setFullName(user.user_metadata?.full_name || "")
+        const loadUserData = async () => {
+            setIsLoading(true)
+            try {
+                // Get fresh user data from Supabase
+                const { data: { user: currentUser }, error } = await supabase.auth.getUser()
+                
+                if (error) {
+                    console.error("Error getting user:", error)
+                    return
+                }
+
+                if (currentUser) {
+                    debugUserData(currentUser)
+                    setEmail(getUserEmail(currentUser))
+                    setFullName(getUserDisplayName(currentUser))
+                } else {
+                    console.log("No user found")
+                }
+            } catch (error) {
+                console.error("Error loading user data:", error)
+            } finally {
+                setIsLoading(false)
+            }
         }
-        setIsLoading(false)
-    }, [user])
+
+        if (user) {
+            loadUserData()
+        } else {
+            console.log("No user in auth context")
+            setIsLoading(false)
+        }
+    }, [user, supabase.auth])
 
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -42,14 +71,42 @@ export default function ProfilePage() {
         setMessage(null)
 
         try {
-            // Update user metadata in Supabase Auth
+            // Update user metadata in Supabase Auth - save to multiple fields for compatibility
             const { error } = await supabase.auth.updateUser({
-                data: { full_name: fullName }
+                data: { 
+                    full_name: fullName,
+                    display_name: fullName  // Also save as display_name for compatibility
+                }
             })
 
             if (error) throw error
 
-            setMessage({ type: "success", text: "Profile updated successfully!" })
+            setMessage({ type: "success", text: "Profile updated successfully! Refreshing data..." })
+
+            // Force complete auth refresh
+            const freshUser = await forceAuthRefresh()
+            
+            if (freshUser) {
+                console.log("Profile update successful, fresh user data:", freshUser.user_metadata)
+                
+                // Update local state
+                setFullName(getUserDisplayName(freshUser))
+                setEmail(getUserEmail(freshUser))
+                
+                // Refresh auth context
+                await refreshUser()
+                
+                // Trigger sync across tabs
+                triggerUserDataSync()
+                
+                setMessage({ type: "success", text: "Profile updated and data refreshed successfully!" })
+            } else {
+                setMessage({ type: "success", text: "Profile updated! Please refresh the page to see changes." })
+                // Fallback: force page reload
+                setTimeout(() => {
+                    window.location.reload()
+                }, 2000)
+            }
         } catch (error: any) {
             console.error("Error updating profile:", error)
             setMessage({ type: "error", text: error.message || "Failed to update profile" })
@@ -65,6 +122,12 @@ export default function ProfilePage() {
 
         if (newPassword !== confirmPassword) {
             setMessage({ type: "error", text: "New passwords don't match" })
+            setLoading(false)
+            return
+        }
+
+        if (newPassword.length < 6) {
+            setMessage({ type: "error", text: "Password must be at least 6 characters long" })
             setLoading(false)
             return
         }
@@ -154,7 +217,44 @@ export default function ProfilePage() {
                                             <p className="text-xs text-gray-500">Email address cannot be changed</p>
                                         </div>
                                     </CardContent>
-                                    <CardFooter className="flex justify-end border-t pt-6">
+                                    <CardFooter className="flex justify-between border-t pt-6">
+                                        <Button 
+                                            type="button" 
+                                            variant="outline"
+                                            onClick={async () => {
+                                                setLoading(true)
+                                                try {
+                                                    setMessage({ type: "success", text: "Refreshing data from database..." })
+                                                    
+                                                    // Validate current metadata
+                                                    await validateUserMetadata(user)
+                                                    
+                                                    // Force complete refresh
+                                                    const freshUser = await forceAuthRefresh()
+                                                    
+                                                    if (freshUser) {
+                                                        console.log("Manual refresh - fresh user data:", freshUser.user_metadata)
+                                                        setFullName(getUserDisplayName(freshUser))
+                                                        setEmail(getUserEmail(freshUser))
+                                                        
+                                                        // Also refresh auth context
+                                                        await refreshUser()
+                                                        
+                                                        setMessage({ type: "success", text: "Data refreshed successfully from database!" })
+                                                    } else {
+                                                        setMessage({ type: "error", text: "Could not refresh data from database!" })
+                                                    }
+                                                } catch (error) {
+                                                    console.error("Error refreshing:", error)
+                                                    setMessage({ type: "error", text: "Error refreshing data!" })
+                                                } finally {
+                                                    setLoading(false)
+                                                }
+                                            }}
+                                            disabled={loading}
+                                        >
+                                            {loading ? "Refreshing..." : "Force Refresh from DB"}
+                                        </Button>
                                         <Button type="submit" disabled={loading} className="bg-red-600 hover:bg-red-700">
                                             {loading ? "Saving..." : "Save Changes"}
                                         </Button>
@@ -172,24 +272,6 @@ export default function ProfilePage() {
                                     </CardHeader>
                                     <CardContent className="space-y-6">
                                         <div className="space-y-2">
-                                            <Label htmlFor="currentPassword">Current Password</Label>
-                                            <div className="relative">
-                                                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                                                <Input
-                                                    id="currentPassword"
-                                                    type="password"
-                                                    value={currentPassword}
-                                                    onChange={(e) => setCurrentPassword(e.target.value)}
-                                                    className="pl-10"
-                                                    placeholder="••••••••"
-                                                    required
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <Separator />
-
-                                        <div className="space-y-2">
                                             <Label htmlFor="newPassword">New Password</Label>
                                             <div className="relative">
                                                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
@@ -201,8 +283,10 @@ export default function ProfilePage() {
                                                     className="pl-10"
                                                     placeholder="••••••••"
                                                     required
+                                                    minLength={6}
                                                 />
                                             </div>
+                                            <p className="text-xs text-gray-500">Minimum 6 characters</p>
                                         </div>
 
                                         <div className="space-y-2">
@@ -217,6 +301,7 @@ export default function ProfilePage() {
                                                     className="pl-10"
                                                     placeholder="••••••••"
                                                     required
+                                                    minLength={6}
                                                 />
                                             </div>
                                             {newPassword && confirmPassword && newPassword !== confirmPassword && (
@@ -227,7 +312,7 @@ export default function ProfilePage() {
                                     <CardFooter className="flex justify-end border-t pt-6">
                                         <Button
                                             type="submit"
-                                            disabled={loading || (newPassword !== confirmPassword && newPassword !== "")}
+                                            disabled={loading || (newPassword !== confirmPassword && newPassword !== "") || newPassword.length < 6}
                                             className="bg-red-600 hover:bg-red-700"
                                         >
                                             {loading ? "Updating..." : "Update Password"}

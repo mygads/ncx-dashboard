@@ -25,6 +25,8 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
+import { getUserDisplayName, debugUserData } from "@/lib/user-utils"
+import { useUserDisplayName, useUserDataSync } from "@/lib/user-hooks"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import Image from "next/image"
 
@@ -49,6 +51,18 @@ export default function DashboardHome() {
   const [isLoadingDataSource, setIsLoadingDataSource] = useState(true)
   const { toast } = useToast()
   const { user } = useAuth()
+  const { displayName } = useUserDisplayName(user)
+  const supabase = createClientComponentClient()
+
+  // Listen for user data sync across tabs
+  useUserDataSync()
+
+  // Debug user data
+  useEffect(() => {
+    if (user) {
+      debugUserData(user)
+    }
+  }, [user])
 
   // Load current data source on component mount
   useEffect(() => {
@@ -393,7 +407,7 @@ export default function DashboardHome() {
           </div>
           <div>
             <h1 className="text-xl md:text-2xl font-bold">
-              Welcome, {user?.user_metadata?.full_name || user?.email || 'User'}
+              Welcome, {displayName}
             </h1>
             <p className="text-red-100 text-sm md:text-base">
               Manage your dashboard data sources here
@@ -596,7 +610,7 @@ export default function DashboardHome() {
                       ) : (
                         <FileText className="h-5 w-5" />
                       )}
-                      Sumber Data Aktif
+                      Active Data Source
                     </CardTitle>
                     <CardDescription>
                       Data source currently being used for the dashboard

@@ -14,6 +14,7 @@ type AuthContextType = {
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, fullName: string) => Promise<void>
   signOut: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -48,10 +49,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // console.log("Auth state changed:", event, session?.user?.user_metadata)
       setSession(session)
       setUser(session?.user ?? null)
       setIsLoading(false)
+      
+      // If user is updated, ensure we have the latest data
+      if (event === 'USER_UPDATED' && session?.user) {
+        // console.log('User updated event detected, refreshing data')
+        // Small delay to ensure data propagation
+        setTimeout(async () => {
+          const { data: { user: freshUser } } = await supabase.auth.getUser()
+          if (freshUser) {
+            setUser(freshUser)
+            // console.log('Fresh user data loaded:', freshUser.user_metadata)
+          }
+        }, 1000)
+      }
     })
 
     return () => {
@@ -123,6 +138,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const refreshUser = async () => {
+    try {
+      // console.log("Starting user refresh...")
+      
+      // Force refresh the auth token first
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession()
+      if (refreshError) {
+        console.error("Error refreshing session:", refreshError)
+      } else {
+        // console.log("Session refreshed successfully")
+      }
+      
+      // Get fresh user data
+      const { data: { user: currentUser }, error } = await supabase.auth.getUser()
+      if (error) {
+        console.error("Error refreshing user:", error)
+        return
+      }
+      
+      // Also get fresh session
+      const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError) {
+        console.error("Error refreshing session:", sessionError)
+      }
+      
+      // Update both user and session state
+      setUser(currentUser)
+      if (currentSession) {
+        setSession(currentSession)
+      }
+      
+      // console.log("User data refreshed:", {
+      //   old_metadata: user?.user_metadata,
+      //   new_metadata: currentUser?.user_metadata
+      // })
+    } catch (error) {
+      console.error("Error in refreshUser:", error)
+    }
+  }
+
   const value = {
     user,
     session,
@@ -130,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signIn,
     signUp,
     signOut,
+    refreshUser,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

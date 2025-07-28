@@ -7,6 +7,8 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
+import { getUserDisplayName, getUserEmail } from "@/lib/user-utils"
+import { useUserDisplayName, useUserDataSync } from "@/lib/user-hooks"
 import {
   Home,
   LineChart,
@@ -145,6 +147,10 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
   const [hasDataSource, setHasDataSource] = useState(false)
   const [currentDataSource, setCurrentDataSource] = useState<DataSource | null>(null)
   const router = useRouter()
+  const { displayName } = useUserDisplayName(user)
+
+  // Listen for user data sync across tabs
+  useUserDataSync()
 
   // Sync local state with prop
   useEffect(() => {
@@ -161,11 +167,19 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
   // Use auth user data directly
   useEffect(() => {
     if (user) {
-      // Use metadata from auth user or set defaults
-      setFullName(user.user_metadata?.full_name || user.email || 'User')
-      setUserEmail(user.email || '')
+      const newDisplayName = getUserDisplayName(user)
+      const newEmail = getUserEmail(user)
+      
+      // Only update if values actually changed to prevent unnecessary re-renders
+      if (newDisplayName !== fullName) {
+        // console.log("Updating sidebar display name:", newDisplayName)
+        setFullName(newDisplayName)
+      }
+      if (newEmail !== userEmail) {
+        setUserEmail(newEmail)
+      }
     }
-  }, [user])
+  }, [user, fullName, userEmail])
 
   // Check for data source
   useEffect(() => {
@@ -522,8 +536,10 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
         </span>
         {!collapsed && (
           <div className="ml-2">
-            <div className="font-semibold text-sm">{fullName || user?.user_metadata?.full_name || user?.email}</div>
-            <div className="text-xs text-gray-500">{userEmail || user?.email}</div>
+            <div className="font-semibold text-sm">
+              {displayName || fullName || getUserDisplayName(user)}
+            </div>
+            <div className="text-xs text-gray-500">{userEmail || getUserEmail(user)}</div>
           </div>
         )}
       </div>
