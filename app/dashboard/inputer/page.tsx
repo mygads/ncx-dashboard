@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import type { AMData, InsightData } from "@/lib/types"
+import type { InsightData } from "@/lib/types"
 import { Chart, registerables } from "chart.js"
 import { ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
@@ -15,18 +15,24 @@ import { ClonePieChart } from "@/components/dashboard/clone-pie-chart"
 import { CloneBarChart } from "@/components/dashboard/clone-bar-chart"
 import { CloneBarOnlyChart } from "@/components/dashboard/clone-baronly-chart"
 import { CloneInsightCard } from "@/components/dashboard/clone-insight-card"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { fetchDataFromSource } from "@/lib/data-source"
 Chart.register(...registerables)
 
-// Fungsi untuk fetch data Imputer dari Google Sheets
-async function fetchImputerData() {
-  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
-  const sheetName = 'INPUTER NCX';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.values || json.values.length < 2) return [];
-  const rows = json.values.slice(1); // skip header
+// Interface for Inputer data
+interface InputerData {
+  name: string
+  total: number
+  failed: number
+  complete: number
+  achPercentage: number
+}
+
+// Function to fetch Inputer data from user-selected data source
+async function fetchImputerData(userId: string) {
+  const result = await fetchDataFromSource(userId, 'INPUTER NCX');
+  if (!result.success || !result.data || result.data.length < 2) return [];
+  const rows = result.data.slice(1); // skip header
   return rows.map((cols: string[]) => {
     const name = cols[0] || "";
     const total = Number(cols[1]) || 0;
@@ -39,36 +45,41 @@ async function fetchImputerData() {
   });
 }
 
-// Fungsi untuk fetch insight Imputer dari Google Sheets
-async function fetchInsightImputer() {
-  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
-  const sheetName = 'Update Text (Looker Studio)';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.values || json.values.length < 1) return "";
-  const headers = json.values[0];
+// Function to fetch Inputer insight from user-selected data source
+async function fetchInsightImputer(userId: string) {
+  const result = await fetchDataFromSource(userId, 'Update Text (Looker Studio)');
+  if (!result.success || !result.data || result.data.length < 1) return "";
+  const headers = result.data[0];
   const idx = headers.findIndex((h: string) => h.toLowerCase().includes("insight inputer"));
   if (idx === -1) return "";
-  // Data insight ada di kolom ke-8 (idx + 1) pada baris header
+  // Insight data is in column (idx + 1) in the header row
   return headers[idx + 1] || "";
 }
 
 export default function ImputerPerformancePage() {
   const [loading, setLoading] = useState(true)
-  const [imputerData, setImputerData] = useState<AMData[]>([])
+  const [imputerData, setImputerData] = useState<InputerData[]>([])
   const [insightImputer, setInsightImputer] = useState("")
   const [selectedImputers, setSelectedImputers] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const supabase = createClientComponentClient()
 
   // Fetch data on component mount
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       try {
-        const [imputerDataResult, insightDataResult] = await Promise.all([fetchImputerData(), fetchInsightImputer()])
+        // Get user ID first
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          console.error("User not authenticated")
+          return
+        }
+
+        const [imputerDataResult, insightDataResult] = await Promise.all([
+          fetchImputerData(user.id), fetchInsightImputer(user.id)
+        ])
 
         setImputerData(imputerDataResult)
         setInsightImputer(insightDataResult)

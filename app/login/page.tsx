@@ -38,24 +38,6 @@ function LoginContent() {
 
     try {
       await signIn(email, password)
-      // Ambil user dari supabase setelah signIn
-      const { data: { user: signedInUser } } = await supabase.auth.getUser()
-      if (signedInUser) {
-        const { data, error } = await supabase
-          .from("users")
-          .select("id")
-          .eq("id", signedInUser.id)
-          .single()
-        if (error && error.code === 'PGRST116') {
-          // Row not found, insert user
-          await supabase.from("users").insert([
-            { id: signedInUser.id, email: signedInUser.email, full_name: signedInUser.user_metadata?.full_name || "" }
-          ])
-        } else if (error && error.code !== 'PGRST116') {
-          // Error lain, log
-          console.error('Supabase select user error:', error)
-        }
-      }
       setTimeout(() => {
         router.push("/dashboard")
       }, 1000)

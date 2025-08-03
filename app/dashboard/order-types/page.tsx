@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
-import type { AMData, InsightData } from "@/lib/types"
+import type { InsightData } from "@/lib/types"
 import { Chart, registerables } from "chart.js"
 import { ChevronLeft, ChevronRight, Search } from "lucide-react"
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
@@ -15,18 +15,24 @@ import { ClonePieChart } from "@/components/dashboard/clone-pie-chart"
 import { CloneBarChart } from "@/components/dashboard/clone-bar-chart"
 import { CloneBarOnlyChart } from "@/components/dashboard/clone-baronly-chart"
 import { CloneInsightCard } from "@/components/dashboard/clone-insight-card"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { fetchDataFromSource } from "@/lib/data-source"
 Chart.register(...registerables)
 
-// Fungsi untuk fetch data Tipe Order dari Google Sheets
-async function fetchTipeOrderData() {
-  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
-  const sheetName = 'TIPE ORDER NCX';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.values || json.values.length < 2) return [];
-  const rows = json.values.slice(1); // skip header
+// Interface untuk data Order Type
+interface OrderTypeData {
+  name: string
+  total: number
+  failed: number
+  complete: number
+  achPercentage: number
+}
+
+// Fungsi untuk fetch data Tipe Order dari sumber data yang dipilih user
+async function fetchTipeOrderData(userId: string) {
+  const result = await fetchDataFromSource(userId, 'TIPE ORDER NCX');
+  if (!result.success || !result.data || result.data.length < 2) return [];
+  const rows = result.data.slice(1); // skip header
   return rows.map((cols: string[]) => {
     const name = cols[0] || "";
     const total = Number(cols[1]) || 0;
@@ -39,16 +45,11 @@ async function fetchTipeOrderData() {
   });
 }
 
-// Fungsi untuk fetch insight Tipe Order dari Google Sheets
-async function fetchInsightTipeOrder() {
-  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
-  const sheetName = 'Update Text (Looker Studio)';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.values || json.values.length < 1) return "";
-  const headers = json.values[0];
+// Fungsi untuk fetch insight Tipe Order dari sumber data yang dipilih user
+async function fetchInsightTipeOrder(userId: string) {
+  const result = await fetchDataFromSource(userId, 'Update Text (Looker Studio)');
+  if (!result.success || !result.data || result.data.length < 1) return "";
+  const headers = result.data[0];
   const idx = headers.findIndex((h: string) => h.toLowerCase().includes("insight tipe order"));
   if (idx === -1) return "";
   // Data insight ada di kolom ke-10 (idx + 1) pada baris header
@@ -57,19 +58,27 @@ async function fetchInsightTipeOrder() {
 
 export default function OrderTypesPage() {
   const [loading, setLoading] = useState(true)
-  const [orderData, setOrderData] = useState<any[]>([])
+  const [orderData, setOrderData] = useState<OrderTypeData[]>([])
   const [insightOrder, setInsightOrder] = useState("")
   const [selectedOrders, setSelectedOrders] = useState<string[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const supabase = createClientComponentClient()
 
   // Fetch data on component mount
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
       try {
+        // Get user ID first
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          console.error("User not authenticated")
+          return
+        }
+
         const [orderDataResult, insightOrderResult] = await Promise.all([
-          fetchTipeOrderData(), fetchInsightTipeOrder()
+          fetchTipeOrderData(user.id), fetchInsightTipeOrder(user.id)
         ])
         setOrderData(orderDataResult)
         setInsightOrder(insightOrderResult || "")

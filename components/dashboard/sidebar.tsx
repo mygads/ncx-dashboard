@@ -7,6 +7,8 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/lib/auth-context"
+import { getUserDisplayName, getUserEmail } from "@/lib/user-utils"
+import { useUserDisplayName, useUserDataSync } from "@/lib/user-hooks"
 import {
   Home,
   LineChart,
@@ -20,6 +22,7 @@ import {
   ChevronRight,
   LogOut,
   ChevronLeft,
+  Lock,
 } from "lucide-react"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
@@ -30,22 +33,26 @@ const topRoutes = [
     label: "Home",
     icon: Home,
     href: "/dashboard/home",
+    requiresDataSource: false, // Home is always accessible
   },
   {
     label: "Revenue",
     icon: LineChart,
     href: "/dashboard/revenue",
+    requiresDataSource: true,
   },
   {
     label: "Sales Operation",
     icon: BarChart3,
     href: "/dashboard/sales",
+    requiresDataSource: true,
   },
-  {
-    label: "Digital Product",
-    icon: Store,
-    href: "/dashboard/products",
-  },
+  // {
+  //   label: "Digital Product",
+  //   icon: Store,
+  //   href: "/dashboard/products",
+  //   requiresDataSource: true,
+  // },
 ]
 
 const middleRoutes = [
@@ -53,36 +60,43 @@ const middleRoutes = [
     label: "Dashboard",
     icon: LayoutDashboard,
     href: "/dashboard/analytics",
+    requiresDataSource: true,
   },
   {
     label: "Unit Segment",
     icon: Calendar,
     href: "/dashboard/segments",
+    requiresDataSource: true,
   },
   {
     label: "Inputer Performance",
     icon: Calendar,
     href: "/dashboard/inputer",
+    requiresDataSource: true,
   },
   {
     label: "AM Performance",
     icon: Calendar,
     href: "/dashboard/am-performance",
+    requiresDataSource: true,
   },
   {
-    label: "Tipe Order Detail",
+    label: "Order Type Detail",
     icon: Calendar,
     href: "/dashboard/order-types",
+    requiresDataSource: true,
   },
   {
     label: "Branch Detail",
     icon: Calendar,
     href: "/dashboard/branches",
+    requiresDataSource: true,
   },
   {
-    label: "Umur Order Detail",
+    label: "Order Age Detail",
     icon: Calendar,
     href: "/dashboard/order-age",
+    requiresDataSource: true,
   },
 ]
 
@@ -97,9 +111,9 @@ const iconColorMap: Record<string, string> = {
   "Unit Segment": "text-orange-500",
   "Inputer Performance": "text-yellow-500",
   "AM Performance": "text-indigo-500",
-  "Tipe Order Detail": "text-pink-500",
+  "Order Type Detail": "text-pink-500",
   "Branch Detail": "text-teal-500",
-  "Umur Order Detail": "text-cyan-500",
+  "Order Age Detail": "text-cyan-500",
   "Target AM": "text-amber-500",
   "Target DATEL": "text-lime-500",
   Settings: "text-gray-500",
@@ -111,6 +125,16 @@ interface SidebarProps {
   onCollapseChange?: (collapsed: boolean) => void
 }
 
+interface DataSource {
+  id: string
+  type: 'spreadsheet' | 'file'
+  name: string
+  url?: string
+  filename?: string
+  uploadedAt: string
+  userId: string
+}
+
 export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChange }: SidebarProps) {
   const pathname = usePathname() || ""
   const { signOut, user } = useAuth()
@@ -120,7 +144,13 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
   const [fullName, setFullName] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [targetAMItems, setTargetAMItems] = useState<{ label: string; href: string }[]>([]);
+  const [hasDataSource, setHasDataSource] = useState(false)
+  const [currentDataSource, setCurrentDataSource] = useState<DataSource | null>(null)
   const router = useRouter()
+  const { displayName } = useUserDisplayName(user)
+
+  // Listen for user data sync across tabs
+  useUserDataSync()
 
   // Sync local state with prop
   useEffect(() => {
@@ -134,58 +164,107 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
     }
   }, [collapsedProp])
 
-  // Fetch user full name and email from DB
+  // Use auth user data directly
   useEffect(() => {
-    async function fetchUserInfo() {
-      if (user) {
-        const supabase = createClientComponentClient()
-        const { data, error } = await supabase.from("users").select("full_name, email").eq("id", user.id).single()
-        if (!error && data) {
-          setFullName(data.full_name)
-          setUserEmail(data.email)
-        }
+    if (user) {
+      const newDisplayName = getUserDisplayName(user)
+      const newEmail = getUserEmail(user)
+      
+      // Only update if values actually changed to prevent unnecessary re-renders
+      if (newDisplayName !== fullName) {
+        // console.log("Updating sidebar display name:", newDisplayName)
+        setFullName(newDisplayName)
+      }
+      if (newEmail !== userEmail) {
+        setUserEmail(newEmail)
       }
     }
-    fetchUserInfo()
+  }, [user, fullName, userEmail])
+
+  // Check for data source
+  useEffect(() => {
+    async function checkDataSource() {
+      if (!user) {
+        setHasDataSource(false)
+        setCurrentDataSource(null)
+        return
+      }
+
+      const supabase = createClientComponentClient()
+      const { data, error } = await supabase
+        .from('data_sources')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('uploaded_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (data && !error) {
+        setHasDataSource(true)
+        setCurrentDataSource(data)
+      } else {
+        setHasDataSource(false)
+        setCurrentDataSource(null)
+      }
+    }
+
+    checkDataSource()
   }, [user])
 
-  // Fetch Target AM data from spreadsheet
+  // Fetch Target AM data from data source
   useEffect(() => {
     async function fetchTargetAMData() {
+      if (!hasDataSource || !user) return
+
       try {
-        const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-        const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
-        const sheetName = 'DataAutoGSlide';
-        const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-        const res = await fetch(url);
-        const json = await res.json();
-        if (!json.values || json.values.length < 2) return;
-        const headers = json.values[0];
-        const bagianSlideIndex = headers.findIndex((h: string) => h === "Bagian Slide");
-        if (bagianSlideIndex === -1) return;
-        const targetAMRows = json.values.slice(1).filter((row: any[]) => {
-          const bagianSlide = row[bagianSlideIndex] || "";
-          return bagianSlide.includes("TARGET AM WBS SULBAGTENG");
-        });
-        const uniqueAMs = new Map<string, { label: string; href: string }>();
+        // Use the same fetchDataFromSource function that other pages use
+        const { fetchDataFromSource } = await import("@/lib/data-source")
+        const dataResult = await fetchDataFromSource(user.id, "DataAutoGSlide")
+        
+        if (!dataResult.success || !dataResult.data || dataResult.data.length < 2) {
+          console.log("No Target AM data found in data source")
+          return
+        }
+
+        const headers = dataResult.data[0]
+        const rows = dataResult.data.slice(1)
+        const bagianSlideIndex = headers.findIndex((h: string) => h === "Bagian Slide")
+        
+        if (bagianSlideIndex === -1) {
+          console.log("Bagian Slide column not found")
+          return
+        }
+
+        const targetAMRows = rows.filter((row: any[]) => {
+          const bagianSlide = row[bagianSlideIndex] || ""
+          return bagianSlide.includes("TARGET AM WBS SULBAGTENG")
+        })
+
+        const uniqueAMs = new Map<string, { label: string; href: string }>()
+        
         targetAMRows.forEach((row: any[]) => {
-          const bagianSlide = row[bagianSlideIndex] || "";
-          const match = bagianSlide.match(/TARGET AM WBS SULBAGTENG\s*(.*?)\s*\/\s*(\d+)/i);
-          if (match && match.length >= 3) {
-            const name = match[1].trim();
-            const slug = name.toLowerCase().replace(/\s+/g, '-');
-            if (!uniqueAMs.has(name)) {
-              uniqueAMs.set(name, { label: name, href: `/dashboard/target-am/${slug}` });
+          const bagianSlide = row[bagianSlideIndex] || ""
+          const lines = bagianSlide.split("\n")
+          if (lines.length >= 2) {
+            const amInfo = lines[1] || ""
+            const nikMatch = amInfo.match(/\/\s*(\d+)/)
+            const name = amInfo.split("/")[0].trim()
+            const slug = name.toLowerCase().replace(/\s+/g, '-')
+            
+            if (name && !uniqueAMs.has(name)) {
+              uniqueAMs.set(name, { label: name, href: `/dashboard/target-am/${slug}` })
             }
           }
-        });
-        setTargetAMItems(Array.from(uniqueAMs.values()));
+        })
+
+        setTargetAMItems(Array.from(uniqueAMs.values()))
       } catch (error) {
-        // Optional: handle error
+        console.error("Error fetching Target AM data for sidebar:", error)
       }
     }
-    fetchTargetAMData();
-  }, []);
+    
+    fetchTargetAMData()
+  }, [hasDataSource, user])
 
   const toggleCollapse = () => {
     const newCollapsed = !collapsed
@@ -240,20 +319,46 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
       <div className="flex-1 overflow-y-auto">
         {/* Top Routes */}
         <div className="py-2">
-          {topRoutes.map((route) => (
-            <Link
-              key={route.href}
-              href={route.href}
-              className={cn(
-                "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition",
-                pathname === route.href ? "bg-gray-100 text-black" : "text-gray-600 hover:bg-gray-100",
-              )}
-              onClick={onItemClick}
-            >
-              <route.icon className={cn("h-5 w-5 min-w-5", iconColorMap[route.label])} />
-              {!collapsed && <span className="ml-3">{route.label}</span>}
-            </Link>
-          ))}
+          {topRoutes.map((route) => {
+            const isLocked = route.requiresDataSource && !hasDataSource
+            
+            if (isLocked) {
+              return (
+                <div
+                  key={route.href}
+                  className={cn(
+                    "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition relative",
+                    "text-gray-400 cursor-not-allowed"
+                  )}
+                >
+                  <route.icon className="h-5 w-5 min-w-5 text-gray-400" />
+                  {!collapsed && (
+                    <>
+                      <span className="ml-3">{route.label}</span>
+                      <Lock className="h-3 w-3 ml-auto text-gray-400" />
+                    </>
+                  )}
+                </div>
+              )
+            }
+            
+            return (
+              <Link
+                key={route.href}
+                href={route.href}
+                className={cn(
+                  "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition",
+                  pathname === route.href 
+                    ? "bg-gray-100 text-black" 
+                    : "text-gray-600 hover:bg-gray-100",
+                )}
+                onClick={onItemClick}
+              >
+                <route.icon className={cn("h-5 w-5 min-w-5", iconColorMap[route.label])} />
+                {!collapsed && <span className="ml-3">{route.label}</span>}
+              </Link>
+            )
+          })}
         </div>
 
         {/* Divider with text */}
@@ -270,36 +375,74 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
 
         {/* Middle Routes */}
         <div className="py-2">
-          {middleRoutes.map((route) => (
-            <Link
-              key={route.href}
-              href={route.href}
-              className={cn(
-                "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition",
-                pathname === route.href || (route.href === "/dashboard/analytics" && pathname === "/dashboard")
-                  ? "bg-gray-100 text-black"
-                  : "text-gray-600 hover:bg-gray-100",
-              )}
-              onClick={onItemClick}
-            >
-              <route.icon className={cn("h-5 w-5 min-w-5", iconColorMap[route.label])} />
-              {!collapsed && <span className="ml-3">{route.label}</span>}
-            </Link>
-          ))}
+          {middleRoutes.map((route) => {
+            const isLocked = route.requiresDataSource && !hasDataSource
+            
+            if (isLocked) {
+              return (
+                <div
+                  key={route.href}
+                  className={cn(
+                    "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition relative",
+                    "text-gray-400 cursor-not-allowed"
+                  )}
+                >
+                  <route.icon className="h-5 w-5 min-w-5 text-gray-400" />
+                  {!collapsed && (
+                    <>
+                      <span className="ml-3">{route.label}</span>
+                      <Lock className="h-3 w-3 ml-auto text-gray-400" />
+                    </>
+                  )}
+                </div>
+              )
+            }
+            
+            return (
+              <Link
+                key={route.href}
+                href={route.href}
+                className={cn(
+                  "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition",
+                  pathname === route.href || (route.href === "/dashboard/analytics" && pathname === "/dashboard")
+                    ? "bg-gray-100 text-black"
+                    : "text-gray-600 hover:bg-gray-100",
+                )}
+                onClick={onItemClick}
+              >
+                <route.icon className={cn("h-5 w-5 min-w-5", iconColorMap[route.label])} />
+                {!collapsed && <span className="ml-3">{route.label}</span>}
+              </Link>
+            )
+          })}
         </div>
 
         {/* Target AM Section */}
         <div className="py-2">
           <button
-            onClick={() => setTargetAMExpanded(!targetAMExpanded)}
-            className="w-full flex items-center px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
+            onClick={() => hasDataSource && setTargetAMExpanded(!targetAMExpanded)}
+            className={cn(
+              "w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition",
+              hasDataSource 
+                ? "text-gray-600 hover:bg-gray-100" 
+                : "text-gray-400 cursor-not-allowed"
+            )}
+            disabled={!hasDataSource}
           >
             {!collapsed &&
               (targetAMExpanded ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronRight className="h-4 w-4 mr-1" />)}
-            <Target className={cn("h-5 w-5 min-w-5", iconColorMap["Target AM"])} />
-            {!collapsed && <span className="ml-3">Target AM</span>}
+            <Target className={cn(
+              "h-5 w-5 min-w-5", 
+              hasDataSource ? iconColorMap["Target AM"] : "text-gray-400"
+            )} />
+            {!collapsed && (
+              <>
+                <span className="ml-3">Target AM</span>
+                {!hasDataSource && <Lock className="h-3 w-3 ml-auto text-gray-400" />}
+              </>
+            )}
           </button>
-          {!collapsed && targetAMExpanded && (
+          {!collapsed && targetAMExpanded && hasDataSource && (
             <div className="pl-12 mt-1 flex flex-col gap-1 border-l-2 border-amber-200">
               {targetAMItems.length === 0 ? (
                 <div className="text-sm text-gray-500 py-2">Loading...</div>
@@ -329,10 +472,16 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
         </div>
 
         {/* Target DATEL Section */}
-        <div className="py-2">
+        {/* <div className="py-2">
           <button
-            onClick={() => setTargetDATELExpanded(!targetDATELExpanded)}
-            className="w-full flex items-center px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100"
+            onClick={() => hasDataSource && setTargetDATELExpanded(!targetDATELExpanded)}
+            className={cn(
+              "w-full flex items-center px-4 py-2 text-sm font-medium rounded-lg transition",
+              hasDataSource 
+                ? "text-gray-600 hover:bg-gray-100" 
+                : "text-gray-400 cursor-not-allowed"
+            )}
+            disabled={!hasDataSource}
           >
             {!collapsed &&
               (targetDATELExpanded ? (
@@ -340,11 +489,19 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
               ) : (
                 <ChevronRight className="h-4 w-4 mr-1" />
               ))}
-            <Target className={cn("h-5 w-5 min-w-5", iconColorMap["Target DATEL"])} />
-            {!collapsed && <span className="ml-3">Target DATEL</span>}
+            <Target className={cn(
+              "h-5 w-5 min-w-5", 
+              hasDataSource ? iconColorMap["Target DATEL"] : "text-gray-400"
+            )} />
+            {!collapsed && (
+              <>
+                <span className="ml-3">Target DATEL</span>
+                {!hasDataSource && <Lock className="h-3 w-3 ml-auto text-gray-400" />}
+              </>
+            )}
           </button>
 
-          {!collapsed && targetDATELExpanded && (
+          {!collapsed && targetDATELExpanded && hasDataSource && (
             <div className="pl-12">
               {targetDATELItems.map((item) => (
                 <Link
@@ -358,7 +515,7 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
               ))}
             </div>
           )}
-        </div>
+        </div> */}
       </div>
 
       {/* User Info di bawah, di atas logout */}
@@ -379,8 +536,10 @@ export function Sidebar({ onItemClick, collapsed: collapsedProp, onCollapseChang
         </span>
         {!collapsed && (
           <div className="ml-2">
-            <div className="font-semibold text-sm">{fullName || user?.user_metadata?.full_name || user?.email}</div>
-            <div className="text-xs text-gray-500">{userEmail || user?.email}</div>
+            <div className="font-semibold text-sm">
+              {displayName || fullName || getUserDisplayName(user)}
+            </div>
+            <div className="text-xs text-gray-500">{userEmail || getUserEmail(user)}</div>
           </div>
         )}
       </div>

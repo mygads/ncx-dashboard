@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import type { AMData, InsightData } from "@/lib/types"
 import { Chart, registerables } from "chart.js"
-import { ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { ChevronLeft, ChevronRight, Search, AlertCircle } from "lucide-react"
 import { DynamicHeader } from "@/components/dashboard/dinamic-header"
 import { LastUpdatedDate, LastUpdatedFooter } from "@/components/dashboard/last-updated"
 import Loading from "@/components/ui/loading"
@@ -15,6 +15,10 @@ import { ClonePieChart } from "@/components/dashboard/clone-pie-chart"
 import { CloneBarChart } from "@/components/dashboard/clone-bar-chart"
 import { CloneBarOnlyChart } from "@/components/dashboard/clone-baronly-chart"
 import { CloneInsightCard } from "@/components/dashboard/clone-insight-card"
+import { fetchDataFromSource } from "@/lib/data-source"
+import { useAuth } from "@/lib/auth-context"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 Chart.register(...registerables)
 
 // Helper function to get color by index
@@ -26,44 +30,78 @@ const getColorByIndex = (index: number) => {
 }
 
 // Fungsi untuk fetch data AM dari Google Sheets
-async function fetchAMData() {
-  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
-  const sheetName = 'AM NCX';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.values || json.values.length < 2) return [];
-  const rows = json.values.slice(1); // skip header
-  return rows.map((cols: string[]) => {
-    const name = cols[0] || "";
-    const total = Number(cols[1]) || 0;
-    const failed = Number(cols[2]) || 0;
-    const complete = Number(cols[10]) || 0;
-    let ach = cols[12] || "0";
-    ach = ach.replace(/%/g, "");
-    const achPercentage = Number(ach) || 0;
-    return { name, total, failed, complete, achPercentage };
-  });
+async function fetchAMData(userId: string) {
+  try {
+    const result = await fetchDataFromSource(userId, 'AM NCX');
+    
+    if (!result.success || !result.data || result.data.length < 2) {
+      return [];
+    }
+
+    const rows = result.data.slice(1); // skip header
+    return rows.map((cols: string[], index: number) => {
+      const name = cols[0] || "";
+      const total = Number(cols[1]) || 0;
+      const failed = Number(cols[2]) || 0;
+      const provisionStart = Number(cols[3]) || 0;
+      const provisionDesign = Number(cols[4]) || 0;
+      const provisionIssued = Number(cols[5]) || 0;
+      const inProgressTotal = Number(cols[6]) || 0;
+      const pendingBASO = Number(cols[7]) || 0;
+      const pendingBillFulfill = Number(cols[8]) || 0;
+      const pendingBillApproval = Number(cols[9]) || 0;
+      const complete = Number(cols[10]) || 0;
+      const cancelAbandoned = Number(cols[11]) || 0;
+      let ach = cols[12] || "0";
+      ach = ach.replace(/%/g, "");
+      const achPercentage = Number(ach) || 0;
+      const rank = index + 1;
+      
+      return { 
+        name, 
+        total, 
+        failed, 
+        provisionStart,
+        provisionDesign,
+        provisionIssued,
+        inProgressTotal,
+        pendingBASO,
+        pendingBillFulfill,
+        pendingBillApproval,
+        complete, 
+        cancelAbandoned,
+        achPercentage,
+        rank
+      };
+    });
+  } catch (error) {
+    console.error("Error fetching AM data:", error);
+    return [];
+  }
 }
 
 // Fungsi untuk fetch insight AM dari Google Sheets
-async function fetchInsightAM() {
-  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
-  const sheetName = 'Update Text (Looker Studio)';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.values || json.values.length < 1) return "";
-  const headers = json.values[0];
-  const idx = headers.findIndex((h: string) => h.toLowerCase().includes("insight am"));
-  if (idx === -1) return "";
-  // Data insight ada di kolom ke-8 (idx + 1) pada baris header
-  return headers[idx + 1] || "";
+async function fetchInsightAM(userId: string) {
+  try {
+    const result = await fetchDataFromSource(userId, 'Update Text (Looker Studio)');
+    
+    if (!result.success || !result.data || result.data.length < 1) {
+      return "";
+    }
+
+    const headers = result.data[0];
+    const idx = headers.findIndex((h: string) => h.toLowerCase().includes("insight am"));
+    if (idx === -1) return "";
+    // Data insight ada di kolom ke-8 (idx + 1) pada baris header
+    return headers[idx + 1] || "";
+  } catch (error) {
+    console.error("Error fetching insight AM:", error);
+    return "";
+  }
 }
 
 export default function AMPerformancePage() {
+  const supabase = createClientComponentClient()
   const [loading, setLoading] = useState(true)
   const [amData, setAMData] = useState<AMData[]>([])
   const [insightAM, setInsightAM] = useState("")
@@ -80,7 +118,13 @@ export default function AMPerformancePage() {
     const fetchData = async () => {
       setLoading(true)
       try {
-        const [amDataResult, insightDataResult] = await Promise.all([fetchAMData(), fetchInsightAM()])
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user?.id) {
+          throw new Error("User not authenticated")
+        }
+
+        const userId = user.id
+        const [amDataResult, insightDataResult] = await Promise.all([fetchAMData(userId), fetchInsightAM(userId)])
 
         setAMData(amDataResult)
         setInsightAM(insightDataResult)

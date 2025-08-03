@@ -12,6 +12,10 @@ import { ModernPieChart } from "@/components/dashboard/modern-pie-chart"
 import { ModernBarChart } from "@/components/dashboard/modern-bar-chart"
 import { ModernHotdaBarChart } from "@/components/dashboard/modern-hotda-bar-chart"
 import { chartConfig } from "@/lib/chart-config"
+import { fetchDataFromSource } from "@/lib/data-source"
+import { useAuth } from "@/lib/auth-context"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 Chart.register(...registerables, ChartDataLabels)
 
 // Define Google Maps global types
@@ -60,152 +64,178 @@ type ProgressType = {
 // }
 
 // Fungsi untuk fetch data summary dari sheet UNIT NCX
-async function fetchUnitSummary() {
-  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
-  const sheetName = 'UNIT NCX';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.values || json.values.length < 2) return {
-    totalOrders: '-',
-    totalFailed: '-',
-    inProgress: '-',
-    pendingBaso: '-',
-    pendingBillingApproval: '-',
-    totalComplete: '-',
-    overallAchPercentage: '-',
-  };
-  const rows = json.values.slice(1); // skip header
-  let totalOrders = 0;
-  let totalFailed = 0;
-  let inProgress = 0;
-  let pendingBaso = 0;
-  let pendingBillingApproval = 0;
-  let totalComplete = 0;
-  let achSum = 0;
-  let achCount = 0;
-  rows.forEach((cols: string[]) => {
-    // Kolom: Total(1), Failed(2), In Progress Total(6), Pending BASO(7), Pending Bill Approval(9), Complete(10), % ACH(12)
-    totalOrders += Number(cols[1]) || 0;
-    totalFailed += Number(cols[2]) || 0;
-    inProgress += Number(cols[6]) || 0;
-    pendingBaso += Number(cols[7]) || 0;
-    pendingBillingApproval += Number(cols[9]) || 0;
-    totalComplete += Number(cols[10]) || 0;
-    let ach = cols[12] || "0";
-    ach = ach.replace(/%/g, "");
-    const achNum = Number(ach);
-    if (!isNaN(achNum)) {
-      achSum += achNum;
-      achCount++;
+async function fetchUnitSummary(userId: string) {
+  try {
+    const result = await fetchDataFromSource(userId, 'UNIT NCX');
+    
+    if (!result.success || !result.data || result.data.length < 2) {
+      return {
+        totalOrders: '-',
+        totalFailed: '-',
+        inProgress: '-',
+        pendingBaso: '-',
+        pendingBillingApproval: '-',
+        totalComplete: '-',
+        overallAchPercentage: '-',
+      };
     }
-  });
-  return {
-    totalOrders: totalOrders.toString(),
-    totalFailed: totalFailed.toString(),
-    inProgress: inProgress.toString(),
-    pendingBaso: pendingBaso.toString(),
-    pendingBillingApproval: pendingBillingApproval.toString(),
-    totalComplete: totalComplete.toString(),
-    overallAchPercentage: achCount > 0 ? (achSum / achCount).toFixed(2) : '-',
-  };
+
+    const rows = result.data.slice(1); // skip header
+    let totalOrders = 0;
+    let totalFailed = 0;
+    let inProgress = 0;
+    let pendingBaso = 0;
+    let pendingBillingApproval = 0;
+    let totalComplete = 0;
+    let achSum = 0;
+    let achCount = 0;
+    
+    rows.forEach((cols: string[]) => {
+      // Kolom: Total(1), Failed(2), In Progress Total(6), Pending BASO(7), Pending Bill Approval(9), Complete(10), % ACH(12)
+      totalOrders += Number(cols[1]) || 0;
+      totalFailed += Number(cols[2]) || 0;
+      inProgress += Number(cols[6]) || 0;
+      pendingBaso += Number(cols[7]) || 0;
+      pendingBillingApproval += Number(cols[9]) || 0;
+      totalComplete += Number(cols[10]) || 0;
+      let ach = cols[12] || "0";
+      ach = ach.replace(/%/g, "");
+      const achNum = Number(ach);
+      if (!isNaN(achNum)) {
+        achSum += achNum;
+        achCount++;
+      }
+    });
+    
+    return {
+      totalOrders: totalOrders.toString(),
+      totalFailed: totalFailed.toString(),
+      inProgress: inProgress.toString(),
+      pendingBaso: pendingBaso.toString(),
+      pendingBillingApproval: pendingBillingApproval.toString(),
+      totalComplete: totalComplete.toString(),
+      overallAchPercentage: achCount > 0 ? (achSum / achCount).toFixed(2) : '-',
+    };
+  } catch (error) {
+    console.error("Error fetching unit summary:", error);
+    return {
+      totalOrders: '-',
+      totalFailed: '-',
+      inProgress: '-',
+      pendingBaso: '-',
+      pendingBillingApproval: '-',
+      totalComplete: '-',
+      overallAchPercentage: '-',
+    };
+  }
 }
 
 // Fungsi untuk fetch data dari sheet YTDProgress NCX
-async function fetchYTDProgress() {
-  const spreadsheetId = '1BerM6n1xjD9f8zRM0sn7Wz-YYNsmPxLJ4WmA7hwnCbc';
-  const apiKey = 'AIzaSyANCiHKoVF1zyeBHIVCGrefzjPssZXYj34';
-  const sheetName = 'YTDProgress NCX';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.values || json.values.length < 2) return { monthlyData: [], ordersCompleteYTD: '-', achLastMonth: 0 };
-  const rows = json.values.slice(1); // skip header
-  // Ambil tahun sekarang
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1; // 1-based
-  // Filter hanya bulan di tahun ini dan <= bulan sekarang
-  const filteredRows = rows.filter((cols: string[]) => {
-    const [year, month] = (cols[0] || '').split('-');
-    return Number(year) === currentYear && Number(month) >= 1 && Number(month) <= currentMonth;
-  });
-  // Penjumlahan YTD hanya bulan yang totalOrders > 0 DAN bulan <= bulan sekarang
-  let ordersCompleteYTD = 0;
-  filteredRows.forEach((cols: string[]) => {
-    let totalOrders = Number(cols[1]);
-    // Hanya jumlahkan bulan yang totalOrders > 0 DAN bulan <= bulan sekarang
-    const [year, month] = (cols[0] || '').split('-');
-    if (!isNaN(totalOrders) && totalOrders > 0 && Number(month) <= currentMonth) {
-      ordersCompleteYTD += totalOrders;
+async function fetchYTDProgress(userId: string) {
+  try {
+    const result = await fetchDataFromSource(userId, 'YTDProgress NCX');
+    
+    if (!result.success || !result.data || result.data.length < 2) {
+      return { monthlyData: [], ordersCompleteYTD: '-', achLastMonth: 0 };
     }
-  });
-  // Ach last month: ambil % ach pada bulan sebelum bulan sekarang, tidak peduli totalOrders
-  let achLastMonth = 0;
-  const lastMonthRow = filteredRows.find((cols: string[]) => {
-    const [year, month] = (cols[0] || '').split('-');
-    return Number(month) === currentMonth - 1;
-  });
-  if (lastMonthRow) {
-    let ach = Number(lastMonthRow[2]);
-    achLastMonth = isNaN(ach) ? 0 : ach;
+
+    const rows = result.data.slice(1); // skip header
+    // Ambil tahun sekarang
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1; // 1-based
+    // Filter hanya bulan di tahun ini dan <= bulan sekarang
+    const filteredRows = rows.filter((cols: string[]) => {
+      const [year, month] = (cols[0] || '').split('-');
+      return Number(year) === currentYear && Number(month) >= 1 && Number(month) <= currentMonth;
+    });
+    // Penjumlahan YTD hanya bulan yang totalOrders > 0 DAN bulan <= bulan sekarang
+    let ordersCompleteYTD = 0;
+    filteredRows.forEach((cols: string[]) => {
+      let totalOrders = Number(cols[1]);
+      // Hanya jumlahkan bulan yang totalOrders > 0 DAN bulan <= bulan sekarang
+      const [year, month] = (cols[0] || '').split('-');
+      if (!isNaN(totalOrders) && totalOrders > 0 && Number(month) <= currentMonth) {
+        ordersCompleteYTD += totalOrders;
+      }
+    });
+    // Ach last month: ambil % ach pada bulan sebelum bulan sekarang, tidak peduli totalOrders
+    let achLastMonth = 0;
+    const lastMonthRow = filteredRows.find((cols: string[]) => {
+      const [year, month] = (cols[0] || '').split('-');
+      return Number(month) === currentMonth - 1;
+    });
+    if (lastMonthRow) {
+      let ach = Number(lastMonthRow[2]);
+      achLastMonth = isNaN(ach) ? 0 : ach;
+    }
+    const monthlyData = filteredRows.map((cols: string[], idx: number) => {
+      const month = cols[0] || "";
+      let totalOrders = Number(cols[1]);
+      let achPercentage = Number(cols[2]);
+      if (isNaN(totalOrders)) totalOrders = 0;
+      if (isNaN(achPercentage)) achPercentage = 0;
+      // Ambil Ach Last Month (bulan sebelumnya dari bulan sekarang)
+      const [year, monthNum] = month.split("-");
+      if (Number(monthNum) === currentMonth - 1) {
+        achLastMonth = achPercentage;
+      }
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      let monthLabel = monthNames[Number(monthNum) - 1] + " " + year;
+      return { month: monthLabel, totalOrders, achPercentage };
+    });
+    return { monthlyData, ordersCompleteYTD: ordersCompleteYTD.toString(), achLastMonth };
+  } catch (error) {
+    console.error("Error fetching YTD progress:", error);
+    return { monthlyData: [], ordersCompleteYTD: '-', achLastMonth: 0 };
   }
-  const monthlyData = filteredRows.map((cols: string[], idx: number) => {
-    const month = cols[0] || "";
-    let totalOrders = Number(cols[1]);
-    let achPercentage = Number(cols[2]);
-    if (isNaN(totalOrders)) totalOrders = 0;
-    if (isNaN(achPercentage)) achPercentage = 0;
-    // Ambil Ach Last Month (bulan sebelumnya dari bulan sekarang)
-    const [year, monthNum] = month.split("-");
-    if (Number(monthNum) === currentMonth - 1) {
-      achLastMonth = achPercentage;
-    }
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    let monthLabel = monthNames[Number(monthNum) - 1] + " " + year;
-    return { month: monthLabel, totalOrders, achPercentage };
-  });
-  return { monthlyData, ordersCompleteYTD: ordersCompleteYTD.toString(), achLastMonth };
 }
 
-async function FetchHotdaData() {
-  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
-  const sheetName = 'BRANCH NCX';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.values || json.values.length < 2) return [];
-  const rows = json.values.slice(1); // skip header
-  return rows.map((cols: string[]) => ({
-    location: cols[0] || "",
-    count: Number(cols[1]) || 0,
-  }));
+async function FetchHotdaData(userId: string) {
+  try {
+    const result = await fetchDataFromSource(userId, 'BRANCH NCX');
+    
+    if (!result.success || !result.data || result.data.length < 2) {
+      return [];
+    }
+
+    const rows = result.data.slice(1); // skip header
+    return rows.map((cols: string[]) => ({
+      location: cols[0] || "",
+      count: Number(cols[1]) || 0,
+    }));
+  } catch (error) {
+    console.error("Error fetching HOTDA data:", error);
+    return [];
+  }
 }
 
 // Fungsi untuk fetch data insight dan summary dari sheet Update Text (Looket Studio)
-async function fetchUpdateTextSummary() {
-  const spreadsheetId = process.env.NEXT_PUBLIC_SPREADSHEET_ID;
-  const apiKey = process.env.NEXT_PUBLIC_SPREADSHEET_API_KEY;
-  const sheetName = 'Update Text (Looker Studio)';
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${sheetName}?key=${apiKey}`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if (!json.values || json.values.length < 1) return { achLastMonth: '-', totalOrdersYTD: '-' };
-  const headers = json.values[0];
-  // Ambil isi kolom setelah header (header + 1)
-  const achLastMonthIdx = headers.findIndex((h: string) => h.toLowerCase().includes('ach last month'));
-  const totalOrdersIdx = headers.findIndex((h: string) => h.toLowerCase().includes('total orders'));
-  let achLastMonth = '-';
-  let totalOrdersYTD = '-';
-  if (achLastMonthIdx !== -1 && headers[achLastMonthIdx + 1]) {
-    achLastMonth = headers[achLastMonthIdx + 1];
+async function fetchUpdateTextSummary(userId: string) {
+  try {
+    const result = await fetchDataFromSource(userId, 'Update Text (Looker Studio)');
+    
+    if (!result.success || !result.data || result.data.length < 1) {
+      return { achLastMonth: '-', totalOrdersYTD: '-' };
+    }
+
+    const headers = result.data[0];
+    // Ambil isi kolom setelah header (header + 1)
+    const achLastMonthIdx = headers.findIndex((h: string) => h.toLowerCase().includes('ach last month'));
+    const totalOrdersIdx = headers.findIndex((h: string) => h.toLowerCase().includes('total orders'));
+    let achLastMonth = '-';
+    let totalOrdersYTD = '-';
+    if (achLastMonthIdx !== -1 && headers[achLastMonthIdx + 1]) {
+      achLastMonth = headers[achLastMonthIdx + 1];
+    }
+    if (totalOrdersIdx !== -1 && headers[totalOrdersIdx + 1]) {
+      totalOrdersYTD = headers[totalOrdersIdx + 1];
+    }
+    return { achLastMonth, totalOrdersYTD };
+  } catch (error) {
+    console.error("Error fetching update text summary:", error);
+    return { achLastMonth: '-', totalOrdersYTD: '-' };
   }
-  if (totalOrdersIdx !== -1 && headers[totalOrdersIdx + 1]) {
-    totalOrdersYTD = headers[totalOrdersIdx + 1];
-  }
-  return { achLastMonth, totalOrdersYTD };
 }
 
 export default function AnalyticsDashboard() {
@@ -233,19 +263,38 @@ export default function AnalyticsDashboard() {
   const [ytdProgress, setYtdProgress] = useState<{ monthlyData: any[]; ordersCompleteYTD: string; achLastMonth: string }>({ monthlyData: [], ordersCompleteYTD: '-', achLastMonth: '-' });
   const [hotdaData, setHotdaData] = useState<{ location: string; count: number }[]>([]);
   const [updateTextSummary, setUpdateTextSummary] = useState<{ achLastMonth: string; totalOrdersYTD: string }>({ achLastMonth: '-', totalOrdersYTD: '-' });
+  const [dataSourceError, setDataSourceError] = useState<string | null>(null);
+  const { user } = useAuth();
 
   // Fetch data dari Google Sheets saat mount
   useEffect(() => {
-    fetchUnitSummary().then(setUnitSummary);
-    fetchYTDProgress().then((result) =>
-      setYtdProgress({
-        ...result,
-        achLastMonth: result.achLastMonth.toString(),
-      })
-    );
-    FetchHotdaData().then(setHotdaData);
-    fetchUpdateTextSummary().then(setUpdateTextSummary);
-  }, []);
+    if (!user) return;
+
+    const loadData = async () => {
+      try {
+        setDataSourceError(null);
+        const summary = await fetchUnitSummary(user.id);
+        setUnitSummary(summary);
+        
+        const ytdResult = await fetchYTDProgress(user.id);
+        setYtdProgress({
+          ...ytdResult,
+          achLastMonth: ytdResult.achLastMonth.toString(),
+        });
+        
+        const hotdaResult = await FetchHotdaData(user.id);
+        setHotdaData(hotdaResult);
+        
+        const updateResult = await fetchUpdateTextSummary(user.id);
+        setUpdateTextSummary(updateResult);
+      } catch (error) {
+        console.error("Error loading data:", error);
+        setDataSourceError("Failed to load data. Please ensure the data source is configured correctly.");
+      }
+    };
+
+    loadData();
+  }, [user]);
 
   // Build data object using unitSummary
   const data = {
@@ -334,6 +383,21 @@ export default function AnalyticsDashboard() {
 
       {/* Dashboard Content */}
       <div className="p-6 space-y-6 flex-1">
+        {/* Error Alert */}
+        {dataSourceError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{dataSourceError}</AlertDescription>
+          </Alert>
+        )}
+
+        {!user && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>Silakan login untuk mengakses dashboard analytics.</AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex justify-between items-center mb-2 px-2 py-2 rounded-lg bg-white shadow-sm border border-gray-100">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-gray-700 tracking-tight text-sm">Last Update</span>
@@ -425,7 +489,7 @@ export default function AnalyticsDashboard() {
           </div>
 
           {/* HOTDA Bar Chart */}
-          <ModernHotdaBarChart data={hotdaData} title="Jumlah Orders berdasarkan HOTDA" className="col-span-2" />
+          <ModernHotdaBarChart data={hotdaData} title="Orders by HOTDA" className="col-span-2" />
         </div>
 
         {/* Footer */}
